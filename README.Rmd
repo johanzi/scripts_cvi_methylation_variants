@@ -5,13 +5,13 @@ date: "`r format(Sys.time())`"
 output:
   html_notebook:
     toc: true
+  pdf_document:
+    toc: true
+  github_document:
+    toc: true
   html_document:
     toc: true
     df_print: paged
-  github_document:
-    toc: true
-  pdf_document:
-    toc: true
 documentclass: article
 classoption: a4paper
 geometry: margin=1in
@@ -20,6 +20,18 @@ geometry: margin=1in
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(eval = FALSE)
 ```
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+# Set so that long lines in R will be wrapped:
+knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 80), tidy = TRUE)
+```
+
+
+```{r}
+# Source
+source("scripts/functions_methylkit.R")
+```
+
 
 # Overview
 
@@ -331,8 +343,6 @@ Different functions were created to run the functions of methylKit in batch. The
 
 Here is described the pipeline used to process the methylation data in methylKit.
 
-
-
 ## Annotation Araport11
 
 We need the last annotation of genes and TEs for Col-0. Use Araport11 annotation
@@ -375,12 +385,11 @@ cat Araport11_GFF3_transposons.bed | awk -F'\t' '$3-$2 < 500 {print $0}' > Arapo
 
 
 ```{r,  message = FALSE}
-
 ####################################
 #       Libraries and functions    #
 ####################################
 
-# Load the R script functions_methylkit.R which contains wrap up functions to run in batch several 
+# Load the R script functions_methylkit.R which contains wrap up functions to run in batch several
 # methylKit functions
 source("functions_methylkit.R")
 
@@ -389,15 +398,15 @@ source("functions_methylkit.R")
 ####################################
 
 # Paths to database for the output files of methylKit
-path_DB_CpG="/path/to/methylDB_CpG"
-path_DB_CHG="/path/to/methylDB_CHG"
-path_DB_CHH="/path/to/methylDB_CHH"
+path_DB_CpG <- "/path/to/methylDB_CpG"
+path_DB_CHG <- "/path/to/methylDB_CHG"
+path_DB_CHH <- "/path/to/methylDB_CHH"
 
 # Create a list of these 3 paths
 list_DB_paths <- list(path_DB_CpG, path_DB_CHG, path_DB_CHH, path_DB_CX)
 
 # Path containing cytosine report and bam files from bismark pipeline
-path_bismark_files=paste("/path/to/bismark/output/files/", sep="")
+path_bismark_files <- paste("/path/to/bismark/output/files/", sep = "")
 
 ####################################################
 ################# BED FILES ########################
@@ -413,22 +422,19 @@ bed_genes_BM_IM <- "BM_IM_gene_ID.bed"
 
 # Analysis on cluster 5 and 6
 # # Path to bed files for region analysis (see section 'Analysis of cluster 5 and 6' for details of these bed files)
-bed_genes_cluster5 <- paste(path_bed, "cluster5_coordinates.bed", sep="")
-bed_genes_cluster6 <- paste(path_bed, "cluster6_coordinates.bed", sep="")
+bed_genes_cluster5 <- paste(path_bed, "cluster5_coordinates.bed", sep = "")
+bed_genes_cluster6 <- paste(path_bed, "cluster6_coordinates.bed", sep = "")
 
-
-#bed_genes_annotate <- paste(workdir, "Arabidopsis_thaliana.TAIR10.39.bed", sep="") # Version that was made from GTF (works with readTranscriptFeatures)
-
+# bed_genes_annotate <- paste(workdir, "Arabidopsis_thaliana.TAIR10.39.bed", sep="") # Version that was made from GTF (works with readTranscriptFeatures)
 
 # All TEs
-bed_TEs <- paste(path_bed,"Araport11_GFF3_transposons.bed", sep="")
+bed_TEs <- paste(path_bed, "Araport11_GFF3_transposons.bed", sep = "")
 
-# TEs longer than 4 kb 
-bed_TEs_4kb <- paste(path_bed,"Araport11_GFF3_transposons_longer_4kb.bed", sep="")
+# TEs longer than 4 kb
+bed_TEs_4kb <- paste(path_bed, "Araport11_GFF3_transposons_longer_4kb.bed", sep = "")
 
 # TEs shorter than 500 bp
-bed_TEs_500bp <- paste(path_bed,"Araport11_GFF3_transposons_smaller_500bp.bed", sep="")
-
+bed_TEs_500bp <- paste(path_bed, "Araport11_GFF3_transposons_smaller_500bp.bed", sep = "")
 
 
 ####################################################
@@ -440,13 +446,13 @@ path_df_accessions <- "df_accessions.txt"
 
 # Get information of the accessions and generate a table
 # Order first the file to export so that the elements are ordered as the fastq files (3542_AA, 3542_AB, ...)
-df_accessions <- read.table(path_df_accessions, header = TRUE, stringsAsFactors = TRUE)  
+df_accessions <- read.table(path_df_accessions, header = TRUE, stringsAsFactors = TRUE)
 
 # Order the accession as list.files() list the bismark cytosine report files
 df_accessions <- order_df_accessions(df_accessions)
 
 # I need to create an hybrid name otherwise the loading of the file won't respect the original order of the input bismark file
-df_accessions$sample <- paste(df_accessions$library, df_accessions$name, sep="_")
+df_accessions$sample <- paste(df_accessions$library, df_accessions$name, sep = "_")
 
 # Make a list of samples
 list_samples <- as.list(as.vector(df_accessions$sample))
@@ -459,14 +465,11 @@ list_treatments <- as.vector(df_accessions$cmt2_allele)
 list_treatments <- as.numeric(list_treatments)
 
 # Vector of the 3 contexts analyzed
-context <- c("CpG","CHG", "CHH")
-
+context <- c("CpG", "CHG", "CHH")
 ```
 
 
 # Create methylKit objects
-
-Generate data for the 41 libraries available.
 
 ## Create methylRawListDB objects
 
@@ -474,7 +477,6 @@ The function `import_bismark_cytosine_report` will retrieve automatically the di
 
 ```{r}
 import_bismark_cytosine_report(path_bismark_files, list_DB_paths, list_samples, list_treatments)
-
 ```
 
 ## Load methylRawListDB objects
@@ -482,7 +484,7 @@ import_bismark_cytosine_report(path_bismark_files, list_DB_paths, list_samples, 
 Once created, load methylRawListDB objects. The files won't actually be loaded but accessed in real time when needed.
 
 ```{r}
-list_methylRawLists <- load_methylRawListDB(list_DB_paths, type="", list_samples, list_treatments)
+list_methylRawLists <- load_methylRawListDB(list_DB_paths, type = "", list_samples, list_treatments)
 ```
 
 ## Filter methylRawList raw
@@ -494,10 +496,10 @@ filter_methylRawList(list_methylRawLists_raw)
 ```
 
 ## Load filtered methylRawListDB objects
-```{r,  message = FALSE}
-list_methylRawLists <- load_methylRawListDB(list_DB_paths, type="filtered", list_samples, list_treatments)
-```
 
+```{r,  message = FALSE}
+list_methylRawLists <- load_methylRawListDB(list_DB_paths, type = "filtered", list_samples, list_treatments)
+```
 
 
 # Subset genomic regions
@@ -507,7 +509,6 @@ We want now to analyze methylation patterns is specific genomic regions. For thi
 ## Subset data
 
 ```{r,  message = FALSE}
-
 # Create subset for methylRawList
 subset_methylObject(list_methylRawLists, list_DB_paths, bed_genes, "genes", "methylRaw")
 
@@ -524,28 +525,24 @@ subset_methylObject(list_methylRawLists, list_DB_paths, bed_TEs_500bp, "TEs_500b
 subset_methylObject(list_methylRawLists, list_DB_paths, bed_genes_cluster5, "genes_cluster5", "methylRaw")
 
 subset_methylObject(list_methylRawLists, list_DB_paths, bed_genes_cluster6, "genes_cluster6", "methylRaw")
-
 ```
 
 ## Load methylRaw subset data
 ```{r}
-
 # Load subset data
 
 # Load methylRawListDB objects (without filtering)
-list_methylRawLists_genes <- load_methylRawListDB(list_DB_paths, type="genes", list_samples, list_treatments)
+list_methylRawLists_genes <- load_methylRawListDB(list_DB_paths, type = "genes", list_samples, list_treatments)
 
-list_methylRawLists_TEs <- load_methylRawListDB(list_DB_paths, type="TEs", list_samples, list_treatments)
+list_methylRawLists_TEs <- load_methylRawListDB(list_DB_paths, type = "TEs", list_samples, list_treatments)
 
-list_methylRawLists_TEs_4kb <- load_methylRawListDB(list_DB_paths, type="TEs_4kb", list_samples, list_treatments)
+list_methylRawLists_TEs_4kb <- load_methylRawListDB(list_DB_paths, type = "TEs_4kb", list_samples, list_treatments)
 
-list_methylRawLists_TEs_500bp <- load_methylRawListDB_wo_CX(list_DB_paths, type="TEs_500bp", list_samples, list_treatments)
+list_methylRawLists_TEs_500bp <- load_methylRawListDB_wo_CX(list_DB_paths, type = "TEs_500bp", list_samples, list_treatments)
 
-list_methylRawLists_genes_BM <- load_methylRawListDB(list_DB_paths, type="genes_BM", list_samples, list_treatments)
+list_methylRawLists_genes_BM <- load_methylRawListDB(list_DB_paths, type = "genes_BM", list_samples, list_treatments)
 
-list_methylRawLists_genes_BM_IM <- load_methylRawListDB(list_DB_paths, type="genes_BM_IM", list_samples, list_treatments)
-
-
+list_methylRawLists_genes_BM_IM <- load_methylRawListDB(list_DB_paths, type = "genes_BM_IM", list_samples, list_treatments)
 ```
 
 
@@ -555,7 +552,6 @@ We want first to visualize the methylation levels in different genomic regions. 
 
 ## Whole genome
 ```{r, fig.width=14, fig.height=5}
-
 df_name <- "df_mean_filtered"
 title <- "Weighted Methylation Level for genes"
 
@@ -565,14 +561,12 @@ load_df_wml(path_DB, df_name)
 
 # Plot (use get() to pass the string name of the dataframe as a R object)
 ggplot_all(get(df_name), title = title)
-
 ```
 
 
 ## Genes
 
 ```{r, fig.width=14, fig.height=5}
-
 df_name <- "df_mean_genes"
 title <- "Weighted Methylation Level for genes"
 
@@ -582,20 +576,17 @@ load_df_wml(path_DB, df_name)
 
 # Plot (use get() to pass the string name of the dataframe as a R object)
 ggplot_all(df_mean_genes, title = title)
-
 ```
 
 ## All TEs
 
 ```{r, fig.width=14, fig.height=5}
-
 df_name <- "df_mean_TEs"
 title <- "Weighted Methylation Level for long TEs (>4 kb)"
 
 get_df_wml(list_methylRawLists_TEs, path_DB, df_name)
 
 load_df_wml(path_DB, df_name)
-
 ```
 
 ## Long TEs
@@ -607,10 +598,578 @@ title <- "Weighted Methylation Level for long TEs (>4 kb)"
 get_df_wml(list_methylRawLists_TEs_4kb, path_DB, df_name)
 
 load_df_wml(path_DB, df_name)
+```
+
+
+# GWAS analysis
+
+
+GWAS was performed as described in this repository: https://github.com/johanzi/gwas_gemma
+
+The script `run_gwas_gemma.sh` can be downloaded from GitHub [gwas_gemma](https://github.com/johanzi/gwas_gemma) repository:
+
+```{bash}
+git clone https://github.com/johanzi/gwas_gemma
+```
+
+
+## Prepare VCF file
+
+Check https://github.com/johanzi/gwas_gemma?tab=readme-ov-file#section-id-35
+
+```{bash, eval=FALSE}
+bcftools view -S list_accessions_to_keep.txt file.vcf.gz > subset_83.vcf
+
+bcftools view -r Chr1,Chr2,Chr3,Chr4,Chr5 subset_80.vcf > subset_83_only_chr.vcf
+
+bcftools view --min-ac=1 --max-alleles 2  subset_80_only_chr.vcf > subset_83_only_chr_biallelic_only_alt.vcf
+
+vcftools --vcf subset_83_only_chr_biallelic_only_alt.vcf  \
+			--minDP 3 --minGQ 25 --remove-indels --recode --recode-INFO-all \
+			--out subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_indels
+```
+
+The output file will be `subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz`.
+
+## Prepare phenotye
+
+Check https://github.com/johanzi/gwas_gemma?tab=readme-ov-file#section-id-139
+
+
+## Run Gemma
+
+The script should be executed for each context and each genomic region:
+
+```{bash}
+
+VCF="subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz"
+
+# Genes
+bash gwas_gemma/run_gwas_gemma.sh CpG_genes.tsv $VCF
+
+bash gwas_gemma/run_gwas_gemma.sh CHG_genes.tsv $VCF
+
+bash gwas_gemma/run_gwas_gemma.sh CHH_genes.tsv $VCF
+
+# TEs
+bash gwas_gemma/run_gwas_gemma.sh CpG_TEs.tsv $VCF
+
+bash gwas_gemma/run_gwas_gemma.sh CHG_TEs.tsv $VCF
+
+bash gwas_gemma/run_gwas_gemma.sh CHH_TEs.tsv $VCF
+
+# long TEs
+bash gwas_gemma/run_gwas_gemma.sh CpG_TEs_4kb.tsv $VCF
+
+bash gwas_gemma/run_gwas_gemma.sh CHG_TEs_4kb.tsv $VCF
+
+bash gwas_gemma/run_gwas_gemma.sh CHH_TEs_4kb.tsv $VCF
+
+```
+
+### GWAS genes
+
+```{r}
+dir_file="/path/to/file/"
+
+file.name <- "CpG_genes.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
+
+
+file.name <- "CHG_genes.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
+
+
+file.name <- "CHH_genes.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
+
+```
+
+### GWAS all TEs
+
+
+```{r}
+dir_file="/path/to/file/"
+
+file.name <- "CpG_TEs.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
+
+
+file.name <- "CHG_TEs.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
+
+
+file.name <- "CHH_TEs.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
+
+
+```
+
+### GWAS long TEs
+
+```{r}
+
+dir_file="/path/to/file/"
+
+file.name <- "CpG_TEs_4kb.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
+
+
+file.name <- "CHG_TEs_4kb.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
+
+
+file.name <- "CHH_TEs_4kb.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 
 ```
 
 
 # DMR analysis for the 3 genes
+
+
+
+# Call allele status
+
+```{bash, eval=FALSE}
+
+# This script defines the step to retrieve the allele status for
+# each CPV-SA accessions of the CMT2, ARABIDILLO-1, and VIM2 variants
+
+################################################################################
+# Packages/Sofwares requires
+################################################################################
+
+# vcf_melt (install with command "pip install PyVCF --user")
+
+# bcftools
+
+# samtools
+
+################################################################################
+########## Get VIM2 deletion, ARA1, and CMT2 status
+################################################################################
+
+# Use VCF file used for GWAS 
+
+VCF="superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz"
+
+#################################################################
+# FBX5
+#################################################################
+
+# Get VCF data for SNP in FBX5
+bcftools view -r Chr2:18513626 $VCF > Chr2_18513626.vcf
+
+# Convert into vertical
+vcf_melt Chr2_18513626.vcf > Chr2_18513626.melted.vcf 
+
+# Keep only line with GQ >= 25 and DP >= 3
+awk '$3>=25 && $4>=3 {print $0}' Chr2_18513626.melted.vcf > Chr2_18513626_GQ25_DP3.melted.vcf
+ 
+# Accessions with alternative allele
+awk '$2 == "1" {print $0}' Chr2_18513626_GQ25_DP3.melted.vcf | wc -l
+84
+
+awk '$2 == "1" {print $0}' Chr2_18513626_GQ25_DP3.melted.vcf | cut -f1 | sort - > FBX5_alt.txt
+awk '$2 == "0" {print $0}' Chr2_18513626_GQ25_DP3.melted.vcf | cut -f1 | sort - > FBX5_ref.txt
+
+
+awk -v OFS='\t' '{print $0,"FBX5_alt"}' FBX5_alt.txt > FBX5_alt_final.txt
+awk -v OFS='\t' '{print $0,"FBX5_ref"}' FBX5_ref.txt > FBX5_ref_final.txt
+
+cat FBX5_alt_final.txt FBX5_ref_final.txt > FBX5_allele_status.txt
+
+rm FBX5_alt.txt FBX5_ref.txt FBX5_alt_final.txt FBX5_ref_final.txt 
+
+#################################################################
+# CMT2
+#################################################################
+
+bcftools view -r Chr4:10420088 $VCF > Chr4_10420088.vcf
+
+# Convert into vertical
+vcf_melt Chr4_10420088.vcf > Chr4_10420088.melted.vcf 
+
+# Keep only line with GQ >= 25 and DP >= 3
+awk '$3>=25 && $4>=3 {print $0}' Chr4_10420088.melted.vcf  > Chr4_10420088_GQ25_DP3.melted.vcf 
+
+# Accessions with alternative allele
+awk '$2 == "1" {print $0}' Chr4_10420088_GQ25_DP3.melted.vcf  | wc -l
+65
+
+awk '$2 == "1" {print $0}' Chr4_10420088_GQ25_DP3.melted.vcf  | cut -f1 | sort - > CMT2_alt.txt
+awk '$2 == "0" {print $0}' Chr4_10420088_GQ25_DP3.melted.vcf  | cut -f1 | sort - > CMT2_ref.txt
+
+awk -v OFS='\t' '{print $0,"CMT2_alt"}' CMT2_alt.txt > CMT2_alt_final.txt
+awk -v OFS='\t' '{print $0,"CMT2_ref"}' CMT2_ref.txt > CMT2_ref_final.txt
+
+cat CMT2_alt_final.txt CMT2_ref_final.txt > CMT2_allele_status.txt
+
+rm CMT2_alt.txt CMT2_ref.txt CMT2_alt_final.txt CMT2_ref_final.txt 
+
+
+#################################################################
+# VIM2 deletion
+#################################################################
+
+# Considering that the VIM2 deletion is not present in the VCF file as it is a 
+# structural variant and not a SNP, we need to assess the presence of the deletion
+# based on read density at the deletion region
+
+# coordinates of the deletion location (based on Cvi-0). The deletion is 2740 bp
+# This region was defined by looking at read mapping in Cvi-0 and determine visually
+# the beginning and end of the deletion
+coordinates="chr1:24586731-24589471"
+
+for i in mappedBAM/*bam; do
+	name=$(basename $i | cut -d'.' -f1)
+	nb_reads=$(samtools view $i $coordinates | wc -l)
+	echo -e "${name}\t${nb_reads}" >> nb_reads_vim2_deletion.txt
+done
+
+cut -f2 nb_reads_vim2_deletion.txt | sort -n -
+# Looking at the distribution of reads, it seems there is threshold at 14 reads. i
+# Let's use 50 reads as the threshold to define that there is indeed a deletion
+
+# Classify each sample based on nb of reads with threshold = 50
+awk -v OFS="\t" '$2 <= 50 {print $1,$2,"deletion"} $2 > 50 {print $1,$2,"no_deletion"}' nb_reads_vim2_deletion.txt > nb_reads_vim2_deletion_status.txt
+
+```
+
+
+# Allele distribution by population
+
+```{bash, eval=FALSE}
+########################################################
+# Summary by population in SA for VIM2, FBX5, and CMT2
+#########################################################
+
+# 4073_M (Cvi-0 is included)
+clean_file="/srv/biodata/dep_coupland/grp_hancock/VCF/santos_clean_2019-07-11.txt"
+
+# File contains 190 accessions
+
+#########################################################
+# For FBX5
+
+while read i; do 
+	grep -w $i FBX5_allele_status.txt >> FBX5_allele_status_SA.txt
+done < /srv/biodata/dep_coupland/grp_hancock/VCF/santos_clean_2019-07-11.txt
+
+while read i; do
+    seqID=$(echo "$i" | cut -f1)
+    name=$(python /home/zicola/SCRIPTS/find_accession/find_accession.py /home/zicola/SCRIPTS/find_accession/updated_list_seqID_name.dict $seqID | cut -f2)
+	population=$(echo $name | cut -d'-' -f1)
+    echo -e "${i}\t${name}\t${population}"
+done < FBX5_allele_status_SA.txt > FBX5_allele_status_SA_with_names.txt
+
+
+# Replace FBX5_ref by 0 and FBX5_alt by 1
+sed -i 's/FBX5_ref/0/' FBX5_allele_status_SA_with_names.txt
+sed -i 's/FBX5_alt/1/' FBX5_allele_status_SA_with_names.txt
+
+# 189 retrieved, accession 12849 has no GT assigned  
+
+cd /srv/netscratch/dep_coupland/grp_hancock/mappedBAM/CVI
+samtools tview  12849.sorted.bam  -p chr2:18513626 --reference /home/zicola/TAIR10_chr_Pt_Mt/TAIR10.fasta
+
+# Weird as many reads support the ALT allele A
+cd /srv/biodata/dep_coupland/grp_hancock/johan/allele_status
+
+# Also present after filtering but no genotype given (second column
+grep "12849" Chr2_18513626_GQ25_DP3.melted.vcf
+12849   .                       ['q25'] Chr2    18513626        T       [A]             1       94957   84      2003
+
+
+#########################################################
+# For CMT2
+
+while read i; do 
+	grep -w $i CMT2_allele_status.txt >> CMT2_allele_status_SA.txt
+done < /srv/biodata/dep_coupland/grp_hancock/VCF/santos_clean_2019-07-11.txt
+
+# 190 accessions retrieved => OK
+
+
+while read i; do
+    seqID=$(echo "$i" | cut -f1)
+    name=$(python /home/zicola/SCRIPTS/find_accession/find_accession.py /home/zicola/SCRIPTS/find_accession/updated_list_seqID_name.dict $seqID | cut -f2)
+	population=$(echo $name | cut -d'-' -f1)
+    echo -e "${i}\t${name}\t${population}"
+done < CMT2_allele_status_SA.txt > CMT2_allele_status_SA_with_names.txt
+
+
+# Replace CMT2_ref by 0 and CMT2_alt by 1
+sed -i 's/CMT2_ref/0/' CMT2_allele_status_SA_with_names.txt
+sed -i 's/CMT2_alt/1/' CMT2_allele_status_SA_with_names.txt
+
+
+#########################################################
+# For VIM2
+
+while read i; do 
+	foo=$(grep -w $i nb_reads_vim2_deletion_all_with_name_clean.txt | cut -f1,3,4)
+	population=$(echo "$foo" | cut -f3 | cut -d'-' -f1)
+	echo -e "${foo}\t${population}"
+done < /srv/biodata/dep_coupland/grp_hancock/VCF/santos_clean_2019-07-11.txt > VIM2_allele_status_SA_with_names.txt
+
+# 190 accessions retrieved => OK
+
+# Replace no_deletion by 0 and deletion by 1
+sed -i 's/no_deletion/0/' VIM2_allele_status_SA_with_names.txt
+sed -i 's/deletion/1/' VIM2_allele_status_SA_with_names.txt
+
+# Integrate that with coordinates data
+
+# Reference files
+/netscratch/dep_coupland/grp_hancock/Celia/Experiments/newBronson/coord_genotype.txt
+
+# Get first 3 first rows
+cut -f1,2,3 /netscratch/dep_coupland/grp_hancock/Celia/Experiments/newBronson/coord_genotype.txt > coord_populations_SA.txt
+```
+
+
+# Map allele distribution by population
+
+```{r}
+#install.packages("scatterpie")
+#install.packages("ggmap")
+#install.packages("maps")
+
+library(scatterpie)
+library(ggmap)
+library(maps)
+library(plyr)
+
+# As input file, I need longitude, latitude, population name, frequency of ancestral allele, frequency of derived allele, gene name (optional if only 1 gene), 
+# the radius to define the size of the pie charts on the map (use total_individuals  * 0.005 / 10)
+```
+
+## Coordinate file 
+
+```{r}
+# Replace Cratera by SCratera in bash
+# Modify header
+# Data from SantoCoordinates.csv files in Google Drive Hancock lab
+# There are coordinates for 31 populations
+
+# I chose arbitrarily S11-rav1	-25.076404	17.114951 as S11 population and S24-1	-25.076925	17.105766 as S24
+# population, remove the other S11 and S24 from the file
+
+df_coordinates <- read.table("data/coord_populations_SA.txt", header=TRUE)
+names(df_coordinates) <- c("population","long","lat")
+```
+
+## VIM2 distribution
+
+```{r}
+
+df_vim2 <- read.table("data/VIM2_allele_status_SA_with_names.txt", header=FALSE)
+names(df_vim2) <- c("seqID","GT","accession","population")
+
+# Summarize by population
+df_vim2_summary <- ddply(df_vim2, .(population), summarise, total=length(population), freq_derived=sum(GT)/total, freq_derived=(sum(GT)/total), freq_ancestral=(1-freq_derived), radius=(total*0.005/10))
+
+# Merge with coordinate, somehow I get duplicated rows. Use unique()
+df_vim2_coord <- unique(merge(df_vim2_summary, df_coordinates, by="population"))
+
+world <- map_data("world")
+SA <- world[world$long > -30 & world$long < -20 & world$lat > 10 & world$lat < 20,]
+
+ggplot(SA, aes(long, lat)) +
+  geom_map(map = world, aes(map_id = region), fill = NA, color = "black") +
+  coord_quickmap() +
+  xlim(-25.1, -25.01) +
+  ylim(17.09, 17.135) +
+  theme(plot.background = element_rect(fill = "transparent"), panel.background = element_rect(fill = "transparent"), panel.grid.minor = element_blank(), panel.grid.major = element_blank(), axis.line.x = element_line(color = "black", size = 0.5), axis.line.y = element_line(color = "black", size = 0.5)) +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  geom_scatterpie(aes(x = long, y = lat, r = radius, group = population), data = df_vim2_coord, cols = c("freq_derived","freq_ancestral"), sorted_by_radius = TRUE, alpha = .5) +
+  labs(fill = "VIM2 alleles") +
+  scale_fill_manual(values = c("coral2", "turquoise4")) +
+  theme(axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16)) +
+  geom_scatterpie_legend(df_vim2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005)
+
+```
+
+
+## CMT2 distribution
+
+```{r}
+
+df_cmt2 <- read.table("data/CMT2_allele_status_SA_with_names.txt", header=FALSE)
+names(df_cmt2) <- c("seqID","GT","accession","population")
+
+# Summarize by population
+df_cmt2_summary <- ddply(df_cmt2, .(population), summarise, total=length(population), freq_derived=(sum(GT)/total), freq_ancestral=(1-freq_derived), radius=(total*0.005/10))
+
+# Merge with coordinate, somehow I get duplicated rows. Use unique()
+df_cmt2_coord <- merge(df_cmt2_summary, df_coordinates, by="population")
+
+world <- map_data("world")
+SA <- world[world$long > -30 & world$long < -20 & world$lat > 10 & world$lat < 20,]
+
+ggplot(SA, aes(long, lat)) +
+  geom_map(map = world, aes(map_id = region), fill = NA, color = "black") +
+  coord_quickmap() +
+  xlim(-25.1, -25.01) +
+  ylim(17.09, 17.135) +
+  theme(plot.background = element_rect(fill = "transparent"), panel.background = element_rect(fill = "transparent"), panel.grid.minor = element_blank(), panel.grid.major = element_blank(), axis.line.x = element_line(color = "black", size = 0.5), axis.line.y = element_line(color = "black", size = 0.5)) +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  geom_scatterpie(aes(x = long, y = lat, r = radius, group = population), data = df_cmt2_coord, cols = c("freq_derived","freq_ancestral"), sorted_by_radius = TRUE, alpha = .5) +
+  labs(fill = "CMT2 alleles") +
+  scale_fill_manual(values = c("turquoise4", "coral2")) +
+  theme(axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16)) +
+  geom_scatterpie_legend(df_cmt2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005)
+
+  
+```
+
+## FBX5 distribution
+
+```{r}
+
+df_fbx5 <- read.table("data/FBX5_allele_status_SA_with_names.txt", header=FALSE)
+names(df_fbx5) <- c("seqID","GT","accession","population")
+
+# Summarize by population
+df_fbx5_summary <- ddply(df_fbx5, .(population), summarise, total=length(population), freq_derived=(sum(GT)/total), freq_ancestral=(1-freq_derived), radius=(total*0.005/10))
+
+# Merge with coordinate, somehow I get duplicated rows. Use unique()
+df_fbx5_coord <- unique(merge(df_fbx5_summary, df_coordinates, by="population"))
+
+world <- map_data("world")
+SA <- world[world$long > -30 & world$long < -20 & world$lat > 10 & world$lat < 20,]
+
+ggplot(SA, aes(long, lat)) +
+  geom_map(map = world, aes(map_id = region), fill = NA, color = "black") +
+  coord_quickmap() +
+  xlim(-25.1, -25.01) +
+  ylim(17.09, 17.135) +
+  theme(plot.background = element_rect(fill = "transparent"), panel.background = element_rect(fill = "transparent"), panel.grid.minor = element_blank(), panel.grid.major = element_blank(), axis.line.x = element_line(color = "black", size = 0.5), axis.line.y = element_line(color = "black", size = 0.5)) +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  geom_scatterpie(aes(x = long, y = lat, r = radius, group = population), data = df_fbx5_coord, cols = c("freq_derived","freq_ancestral"), sorted_by_radius = TRUE, alpha = .5) +
+  labs(fill = "FBX5 alleles") +
+  scale_fill_manual(values = c("coral2","turquoise4")) +
+  theme(axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16)) +
+  geom_scatterpie_legend(df_fbx5_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005)
+
+```
+
+
+## Plot diagram VIM2
+
+```{r}
+df_vim2_coord$population_nb <- paste(df_vim2_coord$population, " n=", df_vim2_coord$total, sep="")
+
+# Remove Cvi
+df <- df_vim2_coord[!(df_vim2_coord$population=="Cvi"),]
+
+# Order accesstion by longitude
+df$population_nb <- factor(df$population_nb, levels = df$population_nb[order(df$long)])
+
+ggplot(data = df, aes(population_nb, freq_derived)) +
+  ggtitle("VIM2 deletion frequency") +
+  geom_bar(aes(x = population_nb, y = freq_derived), stat = "identity", colour = "black", fill = "grey") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("Deletion frequency") +
+  xlab("Population") +
+  scale_y_continuous(labels = scales::percent)
+
+
+```
+
+## Plot diagram CMT2
+
+```{r}
+
+df_cmt2_coord$population_nb <- paste(df_cmt2_coord$population, " n=", df_cmt2_coord$total, sep="")
+
+# Remove Cvi
+df <- df_cmt2_coord[!(df_cmt2_coord$population=="Cvi"),]
+
+# Order accesstion by longitude
+df$population_nb <- factor(df$population_nb, levels = df$population_nb[order(df$long)])
+
+ggplot(data = df, aes(population_nb, freq_derived)) +
+  ggtitle("Derived CMT2 allele frequency") +
+  geom_bar(aes(x = population_nb, y = freq_derived), stat = "identity", colour = "black", fill = "grey") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("Derived allele frequency") +
+  xlab("Population") +
+  scale_y_continuous(labels = scales::percent)
+
+
+```
+
+
+
+## Plot diagram FBX5
+
+```{r}
+# Create new variable which concatenat population name and number of accessions
+df_fbx5_coord$population_nb <- paste(df_fbx5_coord$population, " n=", df_fbx5_coord$total, sep="")
+
+# Remove Cvi
+df <- df_fbx5_coord[!(df_fbx5_coord$population=="Cvi"),]
+
+# Order accesstion by longitude
+df$population_nb <- factor(df$population_nb, levels = df$population_nb[order(df$long)])
+
+ggplot(data = df, aes(population_nb, freq_derived)) +
+  ggtitle("Derived ARABIDILLO-1 allele frequency") +
+  geom_bar(aes(x = population_nb, y = freq_derived), stat = "identity", colour = "black", fill = "grey") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("Derived allele frequency") +
+  xlab("Population") +
+  scale_y_continuous(labels = scales::percent)
+
+```
+
+
+
+
+
+
+
+
+
+
 
 
