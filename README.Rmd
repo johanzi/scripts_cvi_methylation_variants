@@ -17,25 +17,21 @@ classoption: a4paper
 geometry: margin=1in
 ---
 
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(eval = FALSE)
 ```
-
 
 # Overview
 
 This documentation explains step by step how was performed the analysis on whole-genome bisulfite sequencing (WGBS) data on African *Arabidopsis thaliana* accessions (Morocco and Cape Verde) and the reanalysis of a subset of the WGBS data from the 1001 Genome Project (1001GP) ([Kawakatsu et al., 2016](http://www.sciencedirect.com/science/article/pii/S0092867416308522)).
 
-
 # Library preparation
 
-Libraries were prepared as described previously in [Urich et al. 2012](http://www.nature.com/nprot/journal/v10/n3/full/nprot.2014.114.html) with minor modifications. See details of the library preparation protocol in supplementary file XXXX.xlsx [link to supplementary](link to supplementary)
+Libraries were prepared as described previously in [Urich et al. 2012](http://www.nature.com/nprot/journal/v10/n3/full/nprot.2014.114.html) with minor modifications.
 
 # Sequencing
 
 Libraries were pooled based on the 24 NEXTFlex Bisulfite-Seq barcodes (BiooScientific) for multiplex sequencing on the HiSeq3000 sequencer (Illumina) in 150 bp single-end mode.  1 Gb (7 M reads) of data were ordered for each library (minimum required by the sequencing facility). Reads were trimmed from adapters by the sequencing facility using Cutadapt ([Martin et al., 2011](http://journal.embnet.org/index.php/embnetjournal/article/view/200)). Visual inspection on graphics produced by [fastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) was used to visually determine the quality of the reads.
-
 
 # Softwares required
 
@@ -47,21 +43,13 @@ Libraries were pooled based on the 24 NEXTFlex Bisulfite-Seq barcodes (BiooScien
 * bwa (v0.7.15)
 * R (>3.3.0) with the libraries indicated in the scripts
 * [SRA tool kit](https://trace.ncbi.nlm.nih.gov/Traces/sra/sra.cgi?view=toolkit_doc) from NCBI
-
-## Quality control
 * FastQC v0.11.9
 * multiqc v1.6
-
-## Trimming and mapping
 * cutadapt v2.9
-
-## Methylation analysis
-* methylKit R packages and dependencies
-
-
-
+* methylKit (v1.14.2) R package and dependencies
 
 # Reanalysis of the 1001 GP data
+
 
 ## Get information samples
 
@@ -86,23 +74,17 @@ sed 's/,/\t/g' query.txt > accessions_1001genome.txt
 
 A subset of 526 accessions were selected, discarding accessions from USA and replicates. A dataframe containing details about each accessions was created and put in `accessions_1001GP_figure1.txt`.
 
-
 ## Download data
-
 
 Select SRR names of each the 526 accessions to download
 
 ```{bash}
-
 cut -f2 accessions_1001GP_figure1.txt > to_download.txt
-
 ```
-
 
 The script `download_sra.sh` retrieves fastq file for each SRR number.
 
 ```{bash}
-
 i=$1
 
 if [[ ! -e ${i}.sra ]]; then
@@ -142,7 +124,7 @@ done < to_download.txt
 
 ## Mapping with Bismark
 
-Reads were mapped on *A. thaliana* TAIR10 reference [fasta file](https://www.arabidopsis.org/download_files/Genes/TAIR10_genome_release/TAIR10_chromosome_files/TAIR10_chr_all.fas). Note that the fasta file contains the 5 chromosomes and the 2 plastids (chloroplast and mitochondria). In order to be processed by the R package methylKit ([Akalin et al., 2011](https://doi.org/10.1186/gb-2012-13-10-r87)), the cytosine report files from Bismark were generated for each chromosome and each methylation context. In order to perform the analysis on many accessions, the bash script [run_bismark.sh](run_bismark.sh) performs Bismark analysis step-by-step.
+Reads were mapped on *A. thaliana* TAIR10 reference [fasta file](https://www.arabidopsis.org/download_files/Genes/TAIR10_genome_release/TAIR10_chromosome_files/TAIR10_chr_all.fas). Note that the fasta file contains the 5 chromosomes and the 2 plastids (chloroplast and mitochondria). In order to be processed by the R package methylKit ([Akalin et al., 2011](https://doi.org/10.1186/gb-2012-13-10-r87)), the cytosine report files from Bismark were generated for each chromosome and each methylation context. In order to perform the analysis on many accessions, the bash script [run_bismark.sh](scripts/run_bismark.sh) performs Bismark analysis step-by-step.
 
 Note that absolute paths can be given, the output files will be generated in the specified output directory (argument `-o`) or by default in the directory containing the input fastq file if no -o argument is specified. While running, the script will echo each step performed, which can be redirected to a log file.
 
@@ -207,7 +189,6 @@ done < <(ls *fastq.gz)
 
 ```
 
-
 #### Assess mapping efficiency
 
 ```{bash}
@@ -222,7 +203,6 @@ done
 Put data in excel and calculate average and SD
 average: 64.89%
 Stdev: 9.34%
-
 
 #### Assess conversion efficiency
 
@@ -255,9 +235,7 @@ done < list_fastq_files.txt
 
 ```
 
-
 #### Assess mapping efficiency
-
 
 ```{bash}
 
@@ -275,7 +253,6 @@ Stdev: 8.21%
 
 Interestingly, the SE end data map at higher efficiency than PE data (about 10% more uniquely mapped reads) and I observed the same trend for the data of project GC_4050. This is probably due to the fact that more reads are unlinked in SE mode and therefore reads mapping in repetitive regions in PE mode are 2 times more numerous as they belong to the same DNA fragment.
 
-
 #### Assess conversion efficiency
 
 ```{bash}
@@ -286,13 +263,9 @@ for i in *_report.conversion_efficiency.txt; do
 done >> conversion_efficiency.txt
 ```
 
-
-
-
-
 # Analysis of the accessions from Cape Verde and Morocco
 
-We generated WGBS data for 83 accessions from Cape Verde - Santo Antao, 9 from Cape Verde - Fogo, 20 from Morocco and diverse mutants (ARABIDILLO-1 and CMT2). We also included as control the accessions Col-0, Col-3, Doer-10, and UKID116. The data for the fastq files for these samples can be downloaded in the NCBI depository PRJNA612437.
+We generated WGBS data for 83 accessions from Cape Verde - Santo Antao, 20 from Morocco and diverse mutants (ARABIDILLO-1 and CMT2). We also included as control the accessions Col-0, Col-3, Doer-10, and UKID116. The data for the fastq files for these samples can be downloaded in the NCBI depository PRJNA612437.
 
 ## Download fastq files
 
@@ -327,12 +300,6 @@ For each fastq file, run the following command:
 ```{bash}
 bash run_bismark.sh -1 <filename.fastq> -r </path/to/dir_fasta/> -o </name/output/directory/>
 ``` 
-
-
-
-
-
-
 
 
 # Methylation call and DMR
