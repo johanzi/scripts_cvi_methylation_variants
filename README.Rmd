@@ -27,17 +27,12 @@ knitr::opts_chunk$set(tidy.opts = list(width.cutoff = 80), tidy = TRUE)
 ```
 
 
-```{r}
-# Source
-source("scripts/functions_methylkit.R")
-```
-
-
 # Overview
 
-This documentation explains step by step how was performed the analysis on whole-genome bisulfite sequencing (WGBS) data on African *Arabidopsis thaliana* accessions (Morocco and Cape Verde) and the reanalysis of a subset of the WGBS data from the 1001 Genome Project (1001GP) ([Kawakatsu et al., 2016](http://www.sciencedirect.com/science/article/pii/S0092867416308522)).
+This documentation explains step by step how was performed the analysis on whole-genome bisulfite sequencing (WGBS) data on African *Arabidopsis thaliana* accessions (Morocco and Cape Verde) and the reanalysis of a subset of the WGBS data from the 1001 Genome Project (1001GP) ([Kawakatsu et al., 2016](http://www.sciencedirect.com/science/article/pii/S0092867416308522)) and the RNA-seq performed on Cape Verde accessions.
 
-# Library preparation
+
+# WGBS library preparation
 
 Libraries were prepared as described previously in [Urich et al. 2012](http://www.nature.com/nprot/journal/v10/n3/full/nprot.2014.114.html) with minor modifications.
 
@@ -382,16 +377,19 @@ cat Araport11_GFF3_transposons.bed | awk -F'\t' '$3-$2 < 500 {print $0}' > Arapo
 
 ```
 
-
+## R libraries and functions
 
 ```{r,  message = FALSE}
 ####################################
 #       Libraries and functions    #
 ####################################
 
+library(scatterpie)
+library(plyr)
+
 # Load the R script functions_methylkit.R which contains wrap up functions to run in batch several
 # methylKit functions
-source("functions_methylkit.R")
+source("scripts/functions_methylkit.R")
 
 ####################################
 #      Paths to DB directories     #
@@ -864,6 +862,7 @@ awk -v OFS="\t" '$2 <= 50 {print $1,$2,"deletion"} $2 > 50 {print $1,$2,"no_dele
 
 ```
 
+Note that for S3-9 (12849), reads support 50% of A and 50% of T, suggesting heterozygosity for the FBX5 SNP Chr2:18,513,626. We excluded this accession from the analysis based on this uncertainty.
 
 # Allele distribution by population
 
@@ -995,8 +994,10 @@ names(df_coordinates) <- c("population","long","lat")
 df_vim2 <- read.table("data/VIM2_allele_status_SA_with_names.txt", header=FALSE)
 names(df_vim2) <- c("seqID","GT","accession","population")
 
+df_vim2$population <- as.factor(df_vim2$population )
+
 # Summarize by population
-df_vim2_summary <- ddply(df_vim2, .(population), summarise, total=length(population), freq_derived=sum(GT)/total, freq_derived=(sum(GT)/total), freq_ancestral=(1-freq_derived), radius=(total*0.005/10))
+df_vim2_summary <- plyr::ddply(df_vim2, .(population), summarise, total=length(population), freq_derived=sum(GT)/total, freq_derived=(sum(GT)/total), freq_ancestral=(1-freq_derived), radius=(total*0.005/10))
 
 # Merge with coordinate, somehow I get duplicated rows. Use unique()
 df_vim2_coord <- unique(merge(df_vim2_summary, df_coordinates, by="population"))
@@ -1020,6 +1021,7 @@ ggplot(SA, aes(long, lat)) +
 
 ```
 
+![](images/VIM2_allele_map.png)
 
 ## CMT2 distribution
 
@@ -1051,8 +1053,9 @@ ggplot(SA, aes(long, lat)) +
   theme(axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16)) +
   geom_scatterpie_legend(df_cmt2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005)
 
-  
 ```
+
+![](images/CMT2_allele_map.png)
 
 ## FBX5 distribution
 
@@ -1086,6 +1089,7 @@ ggplot(SA, aes(long, lat)) +
 
 ```
 
+![](images/FBX5_allele_map.png)
 
 ## Plot diagram VIM2
 
@@ -1110,6 +1114,11 @@ ggplot(data = df, aes(population_nb, freq_derived)) +
 
 
 ```
+
+
+![](images/VIM2_deletion_frequency.png)
+
+
 
 ## Plot diagram CMT2
 
@@ -1136,7 +1145,7 @@ ggplot(data = df, aes(population_nb, freq_derived)) +
 
 ```
 
-
+![](images/CMT2_deletion_frequency.png)
 
 ## Plot diagram FBX5
 
@@ -1163,13 +1172,541 @@ ggplot(data = df, aes(population_nb, freq_derived)) +
 ```
 
 
+![](images/FBX5_deletion_frequency.png)
+
+# Analysis DNA methylation in fbx5 mutants
+
+
+```{bash, eval=FALSE}
+
+echo "###############################################################################"
+echo "STEP I: Mapping RNA-seq data as first step of RepEnrich2"
+echo "###############################################################################"
+# bowtie2 in /opt/share/software/bin/bowtie2
+# version 2.2.8
+
+fastq_dir="/srv/biodata/irg/grp_hancock/NGS_data/GC_4559/raw_fastq/final/trimmed_reads"
+bowtie_index="~/TAIR10_Chr_no_Pt_Mt/bowtie2_index/TAIR10_bowtie2"
+output_dir="/srv/netscratch/irg/grp_hancock/johan/repenrich2_pipeline/output_4559"
+
+for i in ${fastq_dir}/*.fastq.gz; do
+  name_fastq=$(basename $i | cut -d. -f1)
+  # Create a directory to store the output bam file
+  if [ ! -d ${output_dir}/${name_fastq} ]; then
+    mkdir  ${output_dir}/${name_fastq}
+    echo "bowtie2 -q -p 16 -x $bowtie_index -U $i | samtools view -bS - > ${output_dir}/${name_fastq}/${name_fastq}.bam"
+    bowtie2 -q -p 16 -x $bowtie_index -U $i | samtools view -bS - > ${output_dir}/${name_fastq}/${name_fastq}.bam
+  else
+    echo "${output_dir}/${name_fastq} already exists"
+  fi
+done
+
+echo "###############################################################################"
+echo "STEP II: Split uniquely mapped and multimapping reads"
+echo "###############################################################################"
+
+repenrich2_index="/srv/netscratch/irg/grp_hancock/johan/repenrich2_pipeline/repenrich2_araport11"
+script_repenrich2="/home/zicola/SCRIPTS/analysis_RNA-seq_GC4559_4568_4623/analysis_RepEnrich/RepEnrich2"
+
+
+# Loop over created directories in step I
+for dir in ${output_dir}/*/; do
+name_sample=$(basename $dir)
+  if [ -e ${dir}${name_sample}_multimap.fastq ] && [ -e ${dir}${name_sample}_unique.bam ] && [ -e ${dir}${name_sample}_multimap_filtered.bam ]; then
+    echo "${dir}${name_sample}_unique.bam already exists"
+    echo "${dir}${name_sample}_multimap.fastq already exists"
+    echo "${dir}${name_sample}_multimap_filtered.bam already exists"
+  else
+    name_sample=$(basename $dir)
+    echo "python ${script_repenrich2}/RepEnrich2_subset.py ${dir}${name_sample}.bam 30 ${dir}${name_sample} --pairedend FALSE"
+    python ${script_repenrich2}/RepEnrich2_subset.py ${dir}${name_sample}.bam 30 ${dir}${name_sample} --pairedend FALSE
+  fi
+done
+
+
+echo "###############################################################################"
+echo "STEP III: Mapping to TEs"
+echo "###############################################################################"
+
+te_annotation="/home/zicola/SCRIPTS/analysis_RNA-seq_GC4559_4568_4623/analysis_RepEnrich/araport11_TE_annotation_fixed.txt"
+
+# When the index will be renamed
+for dir in ${output_dir}/*/; do
+  name_sample=$(basename $dir)
+  if [ ! -e ${dir}${name_sample}_fraction_counts.txt ]; then
+    echo "python ${script_repenrich2}/RepEnrich2.py $te_annotation ${dir} ${name_sample} ${repenrich2_index} ${dir}${name_sample}_multimap.fastq ${dir}${name_sample}_unique.bam --is_bed TRUE --cpus 16 --pairedend FALSE"
+    python ${script_repenrich2}/RepEnrich2.py $te_annotation ${dir} ${name_sample} ${repenrich2_index} ${dir}${name_sample}_multimap.fastq ${dir}${name_sample}_unique.bam --is_bed TRUE --cpus 16 --pairedend FALSE
+  else
+    echo "${dir}${name_sample}_fraction_counts.txt already exists"
+  fi
+done
 
 
 
+```
+
+
+```{bash, eval=FALSE}
+nohup bash repenrich2_batch_4559.sh &
+
+```
+
+#.
+
+# RNA-seq library preparation
+
+We generated leaf transcriptomes for 97 Santo Antão accessions, including 11 accessions with three biological replicates. Rosette leaves from 4-true leaves (20 DAG) were collected between ZT3 and ZT6 and flash-frozen into liquid nitrogen. Samples were ground in 2 ml Eppendorf tubes containing one tungsten carbide ball in a TissueLyser II (Qiagen). An aliquot of about 20 mg of powder was transferred into a 96 well plate, and total RNA was prepared with the NucleoMag® 96 RNA kit (Macherey Nagel). Libraries were prepared with the NEBNext Ultra™ Directional RNA Library Prep Kit for Illumina sequencing (New England Biolabs). Approximately about 7 million reads of 150 bp single-end reads were generated on the Illumina sequencer HiSeq3000. The adaptors were trimmed using Cutadapt (parameters -m 20 -q 35) (Martin 2011). Reads were mapped on TAIR10 reference genome and Araport11 gene annotation using HISAT2 (v2.2.0) (Kim et al. 2019, 2). The read count was performed with HTSeq (v0.12.4) (Anders et al. 2015). Differential expression analysis was performed in R using the DESeq2 package (v1.28.1) (Love et al. 2014).
+
+137 samples
+98 accessions (97 SA + Col-0)
+19 samples in 3 replicates (57 samples) + 1 sample in duplicate (S4-B3-14, 4623_AR and 4623_BF)
+CMT2stop = 37/98
+FBX5stop = 42/98
+VIM2del = 45/98
+
+
+| library | sample           | seqID   | FBX5 | CMT2 | VIM2 |
+|---------|------------------|---------|------|------|------|
+| 4559_AA | S11-45           | 27175   | 0    | 1    | 0    |
+| 4559_AB | S11-63           | 15675   | 1    | 0    | 1    |
+| 4559_AC | S11-63           | 15675   | 1    | 0    | 1    |
+| 4559_AD | S11-63           | 15675   | 1    | 0    | 1    |
+| 4559_AE | S11-9            | 27180   | 0    | 1    | 0    |
+| 4559_AH | S15-7            | 22634   | 0    | 0    | 0    |
+| 4559_AI | S15-7            | 22634   | 0    | 0    | 0    |
+| 4559_AJ | S15-7            | 22634   | 0    | 0    | 0    |
+| 4559_AK | S15-T2-15-41     | 2876_X  | 0    | 1    | 0    |
+| 4559_AL | S15-T2-15-41     | 2876_X  | 0    | 1    | 0    |
+| 4559_AM | S15-T2-15-41     | 2876_X  | 0    | 1    | 0    |
+| 4559_AN | S16-T1-15-47     | 2876_J  | 1    | 0    | 1    |
+| 4559_AO | S16-T1-15-47     | 2876_J  | 1    | 0    | 1    |
+| 4559_AP | S16-T1-15-47     | 2876_J  | 1    | 0    | 1    |
+| 4559_AQ | S17-1            | 2876_B  | 0    | 0    | 1    |
+| 4559_AR | S17-1            | 2876_B  | 0    | 0    | 1    |
+| 4559_AS | S17-1            | 2876_B  | 0    | 0    | 1    |
+| 4559_AT | S18-2            | 20683   | 0    | 0    | 0    |
+| 4559_AU | S18-2            | 20683   | 0    | 0    | 0    |
+| 4559_AV | S18-2            | 20683   | 0    | 0    | 0    |
+| 4559_AW | S3-12            | 12912   | 0    | 0    | 1    |
+| 4559_AX | S3-12            | 12912   | 0    | 0    | 1    |
+| 4559_AY | S3-12            | 12912   | 0    | 0    | 1    |
+| 4559_AZ | S3-4             | 13173   | 1    | 0    | 1    |
+| 4559_BA | S3-4             | 13173   | 1    | 0    | 1    |
+| 4559_BB | S3-4             | 13173   | 1    | 0    | 1    |
+| 4559_BC | S4-B2-9          | 13581   | 0    | 1    | 0    |
+| 4559_BD | S4-B2-9          | 13581   | 0    | 1    | 0    |
+| 4559_BE | S4-B2-9          | 13581   | 0    | 1    | 0    |
+| 4559_BF | S5-100           | 22624   | 0    | 0    | 1    |
+| 4559_BG | S5-100           | 22624   | 0    | 0    | 1    |
+| 4559_BH | S5-100           | 22624   | 0    | 0    | 1    |
+| 4559_BI | S7-B2            | 35519   | 0    | 1    | 0    |
+| 4559_BJ | S7-B2            | 35519   | 0    | 1    | 0    |
+| 4559_BK | S7-B2            | 35519   | 0    | 1    | 0    |
+| 4559_BL | S7-B20           | 27172   | 0    | 1    | 0    |
+| 4559_BM | S7-B20           | 27172   | 0    | 1    | 0    |
+| 4559_BN | S7-B20           | 27172   | 0    | 1    | 0    |
+| 4559_BO | S7-B5            | 13578   | 0    | 0    | 0    |
+| 4559_BP | S7-B5            | 13578   | 0    | 0    | 0    |
+| 4559_BQ | S7-B5            | 13578   | 0    | 0    | 0    |
+| 4559_BR | S7-T1-15-2       | 2876_AD | 0    | 1    | 0    |
+| 4559_BS | S7-T1-15-2       | 2876_AD | 0    | 1    | 0    |
+| 4559_BT | S7-T1-15-2       | 2876_AD | 0    | 1    | 0    |
+| 4559_BV | S7-T1-15-89      | 2876_V  | 0    | 0    | 0    |
+| 4559_C  | Col-0            | 6909    | 0    | 0    | 0    |
+| 4559_D  | Cvi-0            | 4073_M  | 1    | 0    | 1    |
+| 4559_E  | Cvi-0            | 4073_M  | 1    | 0    | 1    |
+| 4559_F  | Cvi-0            | 4073_M  | 1    | 0    | 1    |
+| 4559_J  | S10-16           | 15673   | 0    | 0    | 0    |
+| 4559_K  | S10-16           | 15673   | 0    | 0    | 0    |
+| 4559_L  | S10-16           | 15673   | 0    | 0    | 0    |
+| 4559_M  | S10-29           | 15671   | 0    | 0    | 1    |
+| 4559_N  | S10-29           | 15671   | 0    | 0    | 1    |
+| 4559_O  | S10-29           | 15671   | 0    | 0    | 1    |
+| 4559_P  | S11-100          | 2876_AN | 0    | 0    | 1    |
+| 4559_S  | S11-20           | 16293   | 0    | 0    | 1    |
+| 4559_T  | S11-20           | 16293   | 0    | 0    | 1    |
+| 4559_U  | S11-20           | 16293   | 0    | 0    | 1    |
+| 4559_V  | S11-35           | 27174   | 1    | 1    | 1    |
+| 4559_Y  | S11-45           | 27175   | 0    | 1    | 0    |
+| 4559_Z  | S11-45           | 27175   | 0    | 1    | 0    |
+| 4568_A  | S10-102          | 22637   | 1    | 1    | 1    |
+| 4568_B  | S10-12           | 27158   | 0    | 1    | 1    |
+| 4568_C  | S1-100           | 22615   | 0    | 0    | 0    |
+| 4568_D  | S11-101          | 22620   | 1    | 1    | 0    |
+| 4568_E  | S11-48           | 27170   | 1    | 0    | 0    |
+| 4568_F  | S11-54           | 27160   | 0    | 1    | 1    |
+| 4568_G  | S11-61           | 27161   | 1    | 0    | 0    |
+| 4568_H  | S15-1            | 22631   | 1    | 0    | 0    |
+| 4568_I  | S15-3            | 20682   | 1    | 0    | 0    |
+| 4568_J  | S15-6            | 22622   | 0    | 1    | 1    |
+| 4568_K  | S15-T1-15-11     | 2876_C  | 1    | 0    | 0    |
+| 4568_L  | S15-T1-15-4      | 2876_M  | 1    | 0    | 0    |
+| 4568_M  | S15-T2-15-1      | 2876_R  | 1    | 1    | 0    |
+| 4568_N  | S15-T2-15-21     | 2876_F  | 1    | 1    | 0    |
+| 4568_O  | S16-2            | 2876_AR | 1    | 0    | 1    |
+| 4568_P  | S18-3            | 22630   | 0    | 1    | 0    |
+| 4568_Q  | S19-1            | 22633   | 1    | 0    | 1    |
+| 4568_R  | S3-2             | 13179   | 1    | 0    | 1    |
+| 4568_S  | S3-5             | 13183   | 1    | 0    | 1    |
+| 4568_T  | S7-B15           | 16150   | 0    | 0    | 0    |
+| 4568_U  | S8-B100          | 22626   | 0    | 0    | 0    |
+| 4623_A  | S10_101          | 2876_AM | 0    | 1    | 1    |
+| 4623_AB | S15_T3_15_2      | 2876_S  | 0    | 1    | 0    |
+| 4623_AC | S15_T3_15_27     | 2876_G  | 1    | 0    | 1    |
+| 4623_AD | S16_3            | 2876_AS | 1    | 0    | 1    |
+| 4623_AE | S16_5            | 20686   | 1    | 0    | 1    |
+| 4623_AF | S16_8            | 20685   | 1    | 0    | 1    |
+| 4623_AG | S16_L_15_4       | 2876_K  | 1    | 0    | 1    |
+| 4623_AH | S16_T1_15_11     | 2876_Q  | 1    | 0    | 1    |
+| 4623_AI | S16_T1_15_37     | 2876_L  | 1    | 0    | 1    |
+| 4623_AJ | S16_T2_15_1      | 2876_P  | 1    | 0    | 1    |
+| 4623_AK | S18_4            | 22643   | 0    | 1    | 0    |
+| 4623_AL | S18_5            | 27163   | 0    | 1    | 1    |
+| 4623_AM | S19_T2_15_13     | 2876_AA | 1    | 0    | 1    |
+| 4623_AN | S3_1             | 13175   | 1    | 0    | 1    |
+| 4623_AO | S3_100           | 2876_AT | 1    | 0    | 1    |
+| 4623_AP | S3_3             | 13172   | 1    | 0    | 1    |
+| 4623_AQ | S4_B2_2          | 2876_AK | 0    | 0    | 1    |
+| 4623_AR | S4_B3_14         | 27177   | 1    | 0    | 1    |
+| 4623_AS | S5_10            | 2876_AU | 0    | 0    | 1    |
+| 4623_AT | S5_101           | 22632   | 1    | 1    | 0    |
+| 4623_AU | S5_102           | 22618   | 0    | 0    | 1    |
+| 4623_AW | S5_8             | 13177   | 0    | 0    | 1    |
+| 4623_AX | S7_B100          | 2876_AV | 0    | 1    | 0    |
+| 4623_AY | S7_B11           | 27165   | 0    | 1    | 0    |
+| 4623_AZ | S7_T1            | 15669   | 0    | 1    | 0    |
+| 4623_B  | S10_105          | 22619   | 0    | 1    | 1    |
+| 4623_BA | S7_T100          | 22617   | 0    | 1    | 0    |
+| 4623_BB | S7_T1_15_28      | 2876_Z  | 0    | 1    | 0    |
+| 4623_BC | S7_T2            | 27179   | 0    | 1    | 0    |
+| 4623_BD | S7_T3            | 2876_AW | 0    | 1    | 0    |
+| 4623_BE | S8_B9            | 16292   | 0    | 0    | 0    |
+| 4623_BF | S4_B3_14         | 27177   | 1    | 0    | 1    |
+| 4623_C  | S10_5            | 15672   | 0    | 0    | 0    |
+| 4623_D  | S11_102          | 22642   | 0    | 1    | 0    |
+| 4623_E  | S11_103          | 22623   | 0    | 1    | 1    |
+| 4623_F  | S11_105          | 2876_AO | 0    | 1    | 0    |
+| 4623_G  | S11_14           | 15674   | 0    | 1    | 0    |
+| 4623_H  | S11_19           | 35517   | 0    | 0    | 1    |
+| 4623_I  | S11_28           | 2876_AP | 0    | 0    | 0    |
+| 4623_J  | S11_33           | 27169   | 0    | 0    | 0    |
+| 4623_K  | S11_36           | 27181   | 1    | 0    | 1    |
+| 4623_L  | S11_38           | 16151   | 1    | 0    | 1    |
+| 4623_N  | S11_41           | 27182   | 0    | 1    | 0    |
+| 4623_P  | S11_60           | 2876_D  | 1    | 0    | 0    |
+| 4623_Q  | S11_62           | 27162   | 1    | 0    | 0    |
+| 4623_R  | S11_R2_T2_15_233 | 2876_W  | 0    | 0    | 1    |
+| 4623_S  | S15_13           | 22616   | 0    | 1    | 0    |
+| 4623_T  | S15_14           | 22641   | 0    | 1    | 0    |
+| 4623_U  | S15_2            | 20681   | 1    | 0    | 0    |
+| 4623_V  | S15_5            | 22013   | 1    | 0    | 1    |
+| 4623_W  | S15_8            | 22636   | 0    | 0    | 0    |
+| 4623_X  | S15_T1_15_25     | 2876_O  | 1    | 0    | 0    |
+| 4623_Y  | S15_T1_15_31     | 2876_N  | 1    | 0    | 0    |
+| 4623_Z  | S15_T2_15_13     | 2876_AB | 1    | 1    | 0    |
+
+
+## Read trimming
+
+```{bash, eval=FALSE}
+# Trim fastq files
+for i in *.fastq.gz; do
+    name=$(basename $i | cut -d. -f1 -)
+    if [ ! -e trimmed_reads/${name}.fastq* ]; then
+		  zcat $i | cutadapt -m 20 -q 35 -o trimmed_reads/${name}.fastq -
+	  fi
+done
+```
+
+
+## Mapping
+
+### Get reference genome
+
+```{bash, eval=FALSE}
+
+# Download fasta file
+wget https://www.arabidopsis.org/download_files/Genes/TAIR10_genome_release/TAIR10_chromosome_files/TAIR10_chr_all.fas -O TAIR10.fa
+
+# Replace chromosome names to add prefix Chr
+sed -i 's/^>\([1-5]\)/>Chr\1/g' TAIR10.fa
+
+```
+
+### Get gene annotation Araport11
+
+Download from https://www.arabidopsis.org/download/index-auto.jsp?dir=%2Fdownload_files%2FGenes%2FAraport11_genome_release the file Araport11_GFF3_genes_transposons.201606.gff.gz
+
+Convert it in gtf with gffread (argument  `-T main output will be GTF instead of GFF3`) (version 0.11.4)
+
+```{bash}
+# Uncompress
+gunzip Araport11_GFF3_genes_transposons.201606.gff.gz
+
+# Convert with gffread 
+gffread Araport11_GFF3_genes_transposons.201606.gff -T -o Araport11_GFF3_genes_transposons.201606_gffread.gtf
+
+# Change the names of mitochondria and chloroplast to match the fasta reference
+
+cut -f1 Araport11_GFF3_genes_transposons.201606_gffread.gtf | sort - | uniq
+Chr1
+Chr2
+Chr3
+Chr4
+Chr5
+ChrC
+ChrM
+
+sed -i 's/ChrC/chloroplast/g' Araport11_GFF3_genes_transposons.201606_gffread.gtf
+sed -i 's/ChrM/mitochondria/g' Araport11_GFF3_genes_transposons.201606_gffread.gtf
+
+cut -f1 Araport11_GFF3_genes_transposons.201606_gffread.gtf | sort - | uniq
+Chr1
+Chr2
+Chr3
+Chr4
+Chr5
+chloroplast
+mitochondria
+
+```
+
+Note that the protocol https://www.nature.com/articles/nprot.2016.095#Tab1 recommends to create a file for exon and intron before creating the HISAT index.
+
+The two files generated by the python scripts hisat2_extract_exons.py and hisat2_extract_splice_sites.py are bed files of the locations of splicing sites and exons and the corresponding strand orientation.
+
+```{bash}
+# Get python script
+wget https://raw.githubusercontent.com/DaehwanKimLab/hisat2/master/hisat2_extract_exons.py
+wget https://raw.githubusercontent.com/DaehwanKimLab/hisat2/master/hisat2_extract_splice_sites.py
+
+
+# Extract exon and intron coordinates
+python hisat2_extract_exons.py ../Araport11_GFF3_genes_transposons.201606_gffread.gtf > ARAPORT11.exon
+python hisat2_extract_splice_sites.py ../Araport11_GFF3_genes_transposons.201606_gffread.gtf > ARAPORT11.ss
+
+# Build the index
+hisat2-build --ss ARAPORT11.ss --exon ARAPORT11.exon -f TAIR10.fa TAIR10
+
+```
+
+### Mapping 
+
+```{bash, eval=FALSE}
+for i in *.fastq.gz; do
+  name=$(basename $i | cut -d. -f1)
+	hisat2 -p 8 --rna-strandness R --dta -x /path/to/index/TAIR10 -U $i | \
+	samtools view -bS -F 4 - | samtools sort - -o ${name}.bam
+done
+```
+
+
+## Read counting
+
+### Install HTseq
+
+```{bash, eval=FALSE}
+# Install HTseq (version 0.12.4)
+pip install --user numpy --upgrade
+pip install htseq --upgrade
+```
+
+### Gene annotation for htseq
+
+### Keep only CDS and exons
+
+```{bash}
+# Keep only exon and CDS
+grep -vw 'transcript' Araport11_GFF3_genes_transposons.201606_gffread.gtf > Araport11_GFF3_genes.gtf
+```
+
+### Remove miRNAs genes
+
+htseq-count bugs because the miRNA have no gene_id field (only transcript_id). 
+
+```{bash}
+grep -v "ath-miR" Araport11_genes.gtf > Araport11_genes_wo_miRNAs.gtf
+```
+
+### Counting
+
+```{bash, eval=FALSE}
+
+mkdir read_count_htseq
+
+for i in *bam; do
+	name_file=$(basename $i | cut -d. -f1 -)
+	if [! -e ./read_count_htseq/${name_file}.count ]; then
+	  samtools view $i | \
+	  htseq-count -s reverse -t exon -i gene_id - Araport11_genes_wo_miRNAs.gtf > ./read_count_htseq/${name_file}.count
+  fi
+done
+```
+
+
+### Count merging
+
+Gather the read counts of different samples in one file using the bash script [scripts/merge_counts.sh](merge_counts.sh).
+
+```{bash, eval=FALSE}
+cd read_count_htseq
+
+# Create list_file_counts.txt and sample_names.txt file, I would use the library code for sample names
+for i in *count; do
+  echo $i >> list_file_counts.txt
+  echo $i | cut -d. -f1 >> sample_names.txt
+done
+
+# Merge
+bash merge_counts.sh list_file_counts.txt sample_names.txt > cts.txt
+
+```
+
+The `cts.txt` file contains the raw read count with the samples in columns and the genes in row.
+
+
+## Analysis in R
+
+### R Libraries
+
+```{r, warning=FALSE, echo=FALSE}
+# RNA-seq analysis
+library("DESeq2")
+
+# Plotting functions
+library("ggplot2")
+library("ggpubr")
+library(gridExtra)
+
+# Perform Bayesian shrinkage estimators for effect sizes in GLM models
+#library("apeglm")
+
+# Subset and organize dataframes
+library("dplyr")
+library("tidyverse")
+library("magrittr")
+
+# Handle DESeResults to Dataframe conversion
+library("tibble")
+
+# Test for significant overlaps
+library(GeneOverlap)
+
+# Make Venn diagram
+library(VennDiagram)
+
+# Heat map
+library("pheatmap")
+
+# Function
+give.n <- function(x){
+  return(c(y = mean(x), label = length(x)))
+}
+
+```
+
+
+### Load cts and coldata
+
+```{r}
+# Load coldata with sample description and variables
+coldata <- read.table("data/coldata.txt", header=TRUE, row.names=1, check.names = FALSE)
+# Convert the variables into factors
+col_names <- names(coldata)
+coldata[,col_names] <- lapply(coldata[,col_names] , factor)
+
+# Load cts
+# cts <- read.table("data/cts.txt", header=TRUE, row.names=1, check.names = FALSE)
+
+# Turn into a Rds object for smaller size (twice smaller)
+saveRDS(cts,"data/cts.Rds")
+
+# Delete cts.txt file to save space on GitHub
+# file.remove("data/cts.txt")
+
+# Load Rds object 
+cts <-  readRDS("data/cts.Rds")
+
+### Check that sample names match in both files
+all(colnames(cts) == rownames(coldata))
+
+```
 
 
 
+## Replicates analysis
 
+We have in total 19 accessions with 3 replicates so 57 samples.
+
+```
+Cvi-0
+S10-16
+S10-29
+S11-20
+S11-45
+S11-63
+S15-7
+S15-T2-15-41
+S16-T1-15-47
+S17-1
+S18-2
+S3-12
+S3-4
+S4-B2-9
+S5-100
+S7-B2
+S7-B20
+S7-B5
+S7-T1-15-2
+```
+
+```{r}
+
+rep_samples <- as.vector(read.table("data/samples_replicates_RNAseq.txt")$V1)
+
+cts_rep <- cts[,rep_samples]
+
+coldata_rep <- coldata[rep_samples,]
+
+# Check if order followed
+all(colnames(cts_rep) == rownames(coldata_rep))
+
+```
+
+### PCA analysis
+
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData = cts_rep,
+                              colData = coldata_rep,
+                              design= ~1)
+
+keep <- rowSums(counts(dds)) >= 10
+dds <- dds[keep,]
+
+dds <- DESeq(dds)
+
+# Get only results
+res <- results(dds)
+
+# Variance stabilizing transformation
+vsd <- vst(dds, blind=FALSE)
+
+# Create PCA
+pcaData <- DESeq2::plotPCA(vsd, intgroup=c("sample"), returnData=TRUE)
+
+# Get percentage variation
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+p <- ggplot(pcaData, aes(PC1, PC2, color=sample, label = sample)) +  xlab(paste0("PC1: ",percentVar[1],"% variance")) + ylab(paste0("PC2: ",percentVar[2],"% variance")) +  theme_bw()+  theme(legend.title = element_blank()) + theme(legend.position = "none")
+
+p + geom_text(size = 4) + ggtitle("PCA RNA-seq replicates") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+![](images/PCA_replicates.png)
+
+Most biological replicates cluster tightly together, indicating homogenous conditions across the growth chamber (replicates were separated randomly across the trays).
 
 
 
