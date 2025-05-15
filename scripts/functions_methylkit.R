@@ -935,8 +935,8 @@ merge_DMRs <- function(methylDiff_object){
 #saveRDS(term2name, "data/term2name.rds")
 
 # Objects needed for GO analysis
-GO_analysis_data <-  readRDS("data/GO_analysis_data.rds")
-term2name <- readRDS("data/term2name.rds")
+#GO_analysis_data <-  readRDS("data/GO_analysis_data.rds")
+#term2name <- readRDS("data/term2name.rds")
 
 
 # Function to perform ego
