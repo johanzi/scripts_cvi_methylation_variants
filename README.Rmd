@@ -1225,16 +1225,41 @@ git clone https://github.com/johanzi/gwas_gemma
 
 ## SNP calling with the SHORE pipeline
 
-This pipeline is based on SHORE ([Ossowski et al., 2008](https://genome.cshlp.org/content/18/12/2024.long)). Check documentation [here](http://shore.sourceforge.net/wiki/). The pipeline described here derived from [Durvasula et al., 2017](https://www.pnas.org/content/114/20/5213) with minor modifications.
-
-The documentation here is derived from https://github.com/HancockLab/SNP_calling_Arabidopsis?tab=readme-ov-file#shore-pipeline.
-
-
 ### Required softwares
 
 * BWA (0.7.5 used)
 * SHORE (0.9.3 used)
 * VCFTOOLS (0.1.14 used)
+* SRA toolkit
+
+This pipeline is based on SHORE ([Ossowski et al., 2008](https://genome.cshlp.org/content/18/12/2024.long)). Check documentation [here](http://shore.sourceforge.net/wiki/). The pipeline described here derived from [Durvasula et al., 2017](https://www.pnas.org/content/114/20/5213) with minor modifications.
+
+The documentation here is derived from https://github.com/HancockLab/SNP_calling_Arabidopsis?tab=readme-ov-file#shore-pipeline.
+
+### Download raw fastq reads
+
+The paired-end sequencing data of the 189 CVI accessions from Santo Antao were published in [Fulgione et al 2022](https://www.nature.com/articles/s41467-022-28800-z) and are available in ENA (accession code PRJEB39079 https://www.ebi.ac.uk/ena/browser/view/PRJEB39079).
+
+Data can be downloaded using fasterq-dump from SRA toolkit:
+
+```{bash, eval=FALSE}
+
+# Install SRA toolkit if needed
+conda install -c bioconda sra-tools
+
+while read i; do
+  accession_ID=$(echo "$i" | cut -f1)
+  echo "fasterq-dump $accession_ID -S -e 6 --split-files -O output_dir/"
+  fasterq-dump $accession_ID -S -e 6 --split-files -O output_dir/
+done < <(grep "^ERR" data/WGS_ENA_data_189_SA.txt)
+
+```
+
+-S: skip technical reads
+-e 6: use 6 threads
+--split-files: splits into _1.fastq and _2.fastq
+-O output_dir/: specify output directory
+
 
 ### Alignment
 
@@ -1284,20 +1309,15 @@ shore convert Alignment2Maplist <alignment.sam> --refseq <reference.fa> > <align
 shore sort --preset maplist --infiles <file.map.list> --inplace
 ```
 
-
 ### Convert fasta reference in SHORE format
 
 SHORE creates from the reference FASTA file mapping indices and caculates GC content and sequence complexity. Check more [here](http://shore.sourceforge.net/wiki/index.php/Shore_preprocess)
 
 ```{bash, eval=FALSE}
 shore preprocess -C --indexes BWA,SuffixArray --fastafile <reference.fa> --indexfolder <output_directory>
-
-# Check with Andrea with --indexes parameters, not in documentation http://shore.sourceforge.net/wiki/index.php/Shore_preprocess
-
 ```
 
 The output file which should be used in the next step is named `reference.fa.shore`.
-
 
 ### Call SNPs
 
@@ -1311,7 +1331,6 @@ shore/./shore consensus \
     -i <alignment.map.list> \
     -a <scoring_matrix_hom.txt> \
     -b 0.7 -g 4 -N
-
 ```
 
 ### Convert SHORE output to VCF
@@ -1322,7 +1341,6 @@ The file `quality_variant.txt` and `quality_reference.txt` should be converted i
 shore convert Variant2VCF <reference.fa> < quality_variant.txt > quality_variant.vcf
 
 shore convert Variant2VCF <reference.fa> < quality_reference.txt > quality_reference.vcf
-
 ```
 
 Compress the files and do the concatenation
@@ -1349,14 +1367,17 @@ The pipeline described above is performed for each sample. Once all samples are 
 ```{bash, eval=FALSE}
 # All vcf files end with the suffix .vcf.gz
 vcf-merge *.vcf.gz | bgzip -c > merged.vcf.gz
-
 ```
+
+## SNP annotation in CVI
+
+Use SNPeff to annotate variants present within Santo Antao island. We have WGS data for 190 accessions.
+
 
 ## Prepare VCF file for the 83 CVI accession
 
 The VCF file `superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz` (matching the `merged.vcf.gz` described before) was generated with the Shore pipeline ([Ossowski et al., 2008](http://genome.cshlp.org/content/18/12/2024). 
 
-The sequencing data of the CVI accessions was published in [Fulgione et al 2022](https://www.nature.com/articles/s41467-022-28800-z) and are available in ENA (accession code PRJEB39079).
 
 
 ```{bash, eval=FALSE}
@@ -1459,6 +1480,7 @@ SNP_to_BED(SNP_significant, "data/mCG_whole_genome_GWAS_SNPs.bed")
 #### mCHG
 
 ```{r}
+dir_file="data/output_sXX/"
 
 file.name <- "CHG_whole_genome.assoc.clean.txt"
 
@@ -1474,6 +1496,8 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 #### mCHH
 
 ```{r}
+dir_file="data/output_sXX/"
+
 file.name <- "CHH_whole_genome.assoc.clean.txt"
 
 path.file <- paste(dir_file, file.name, sep="")
@@ -1513,6 +1537,8 @@ SNP_to_BED(SNP_significant, "data/gbM_GWAS_SNPs.bed")
 source("scripts/functions_gwas.R") 
 
 file.name <- "CpG_genes.assoc.clean.txt"
+
+dir_file="data/output_sXX/"
 
 path.file <- paste(dir_file, file.name, sep="")
 
@@ -1556,12 +1582,11 @@ Top SNP on Chr5 is near VIM3 (790 kb upstream) and falls within the gene AT5G378
 
 ![](images/chr5_15047549.png)
 
-
-
-
 #### mCHG 
 
 ```{r}
+dir_file="data/output_sXX/"
+
 file.name <- "CHG_genes.assoc.clean.txt"
 
 path.file <- paste(dir_file, file.name, sep="")
@@ -1576,6 +1601,7 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 #### mCHH
 
 ```{r}
+dir_file="data/output_sXX/"
 
 file.name <- "CHH_genes.assoc.clean.txt"
 
@@ -1609,6 +1635,8 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 #### mCHG
 
 ```{r}
+dir_file="data/output_sXX/"
+
 file.name <- "CHG_TEs.assoc.clean.txt"
 
 path.file <- paste(dir_file, file.name, sep="")
@@ -1669,6 +1697,7 @@ manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$
 #### mCHH
 
 ```{r}
+dir_file="data/output_sXX/"
 
 file.name <- "CHH_TEs.assoc.clean.txt"
 
@@ -1748,6 +1777,7 @@ ggsave(filename = "GWAS_test.png", width = 13, height = 4, units = "cm", dpi=300
 #### mCHG
 
 ```{r}
+dir_file="data/output_sXX/"
 
 file.name <- "CHG_TEs_4kb.assoc.clean.txt"
 
@@ -1758,10 +1788,12 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 ```
 
 ![](images/GWAS_mCHG_long_TEs.png)
+##### Highlight FBX5 SNP
 
 ```{r}
+source("scripts/functions_gwas.R")
 
-source("scripts/functions_gwas.R") 
+dir_file="data/output_sXX/"
 
 file.name <- "CHG_TEs_4kb.assoc.clean.txt"
 
@@ -1800,9 +1832,12 @@ SNP_to_BED(SNP_mCHG_long_TEs, "data/mCHG_long_TEs_GWAS_SNPs.bed")
 
 The peak at Chr5 seems to be close to SUVH4. Most significant SNP is 5:5843297
 
-```{r}
+##### Highlight FBX5, SUVH4, AGO9, DRM1, and MET1
 
+```{r}
 source("scripts/functions_gwas.R") 
+
+dir_file="data/output_sXX/"
 
 file.name <- "CHG_TEs_4kb.assoc.clean.txt"
 
@@ -1845,14 +1880,10 @@ manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$
 
 ![](images/GWAS_mCHG_long_TEs_genes_highlighted.png)
 
-
 ```{r}
 
 SNP_mCHG_long_TEs <- GWAS_run(path.file, threshold_pvalue = 10e-5)
 # 50 SNPs recovered
-
-
-
 
 SNP_to_BED(SNP_mCHG_long_TEs, "data/mCHG_long_TEs_GWAS_SNPs.bed")
 
@@ -1862,6 +1893,7 @@ SNP_to_BED(SNP_mCHG_long_TEs, "data/mCHG_long_TEs_GWAS_SNPs.bed")
 #### mCHH
 
 ```{r}
+dir_file="data/output_sXX/"
 
 file.name <- "CHH_TEs_4kb.assoc.clean.txt"
 
@@ -1873,6 +1905,154 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 
 ![](images/GWAS_mCHH_long_TEs.png)
 
+
+## Variants at SUVH4, AGO9, DRM1, and MET1
+
+We used SnpEff (https://pcingola.github.io/SnpEff/) to define variants and their effect of the 4 candidate genes in Chr5 (AGO9, SUVH4, DRM1, and MET1).
+
+### Subsample VCF file for the 190 Santo Antao accessions
+
+```{bash, eval=FALSE}
+
+module load bcftools vcftools
+
+# Keep the 190 accessions from Santo Antao and keep only chromosomes
+bcftools view -S list_190_SA_accessions.txt -r Chr1,Chr2,Chr3,Chr4,Chr5 \
+    superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz > subset_190_SA.vcf
+    
+# Remove positions without alternative alleles and non-biallelic SNPs
+bcftools view --min-ac=1 --max-alleles 2  subset_190_SA.vcf > subset_190_SA_alt.vcf
+
+# Filter SNP quality with DP>=3, GQ>=25, remove all SNP with more than 10% missing data
+vcftools --vcf subset_190_SA_alt.vcf --minDP 3 --minGQ 25 --max-missing 0.9 \
+  --recode --recode-INFO-all --out subset_190_SA_alt_DP3_GQ25
+
+#After filtering, kept 484836 out of a possible 1370456 Sites
+#Run Time = 222.00 seconds
+
+# Mark singletons
+vcftools --singletons --vcf subset_190_SA_alt_DP3_GQ25.recode.vcf
+
+wc -l out.singletons
+# 5743 out.singletons
+
+# Remove singletons
+vcftools --vcf subset_190_SA_alt_DP3_GQ25.recode.vcf \
+  --exclude-positions out.singletons --recode \
+  --recode-INFO-all --out subset_190_SA_alt_DP3_GQ25_wo_singletons
+  
+
+
+#After filtering, kept 479094 out of a possible 484836 Sites
+#Run Time = 110.00 seconds
+
+# Get allele frequency of each SNP on the SA population only
+# https://speciationgenomics.github.io/filtering_vcfs/
+vcftools --vcf subset_190_SA_alt_DP3_GQ25_wo_singletons.recode.vcf \
+  --freq2 --out frequencies_SA
+
+# Return file frequencies_SA.frq
+# Remove all variants that are absent in SA (col 6 = 0% AF) and remove variants 
+# where no data are present in SA (returns -nan error value when doing the division)
+awk '$4!=0 && $6!=0' frequencies_SA.frq | grep -v "\-nan" > list_SNP_ALT_more_than_0.txt
+
+wc -l list_SNP_ALT_more_than_0.txt
+442725 list_SNP_ALT_more_than_0.t
+
+# Retrieve SNPs with ALT present in SA
+vcftools --vcf subset_190_SA_alt_DP3_GQ25_wo_singletons.recode.vcf \
+  --positions list_SNP_ALT_more_than_0.txt --recode \
+  --recode-INFO-all --out subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only
+#After filtering, kept 442724 out of a possible 479094 Sites
+#Run Time = 104.00 seconds
+
+# Compress this file for further use in other analysis
+bcftools view subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.vcf -Oz -o subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.vcf.gz
+bcftools index subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.vcf.gz
+
+```
+
+442724 SNPs remain. Outpuf VCF file is `subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.vcf`
+
+### Run SnpEff
+
+```{bash, eval=FALSE}
+
+# Download snpeff (2025-05-15)
+wget https://snpeff.blob.core.windows.net/versions/snpEff_latest_core.zip
+
+unzip snpEff_latest_core.zip
+
+cd snpEff
+
+# Check version
+java -jar snpEff.jar -version
+SnpEff  5.2f    2025-02-07
+
+# Install Arabidopsis database (Java 24.0.1 is used)
+java -jar snpEff.jar download Arabidopsis_thaliana
+
+\ls -1 data/Arabidopsis_thaliana/
+sequence.1.bin
+sequence.2.bin
+sequence.3.bin
+sequence.4.bin
+sequence.5.bin
+sequence.bin
+snpEffectPredictor.bin
+
+# Run SnpEff
+java -Xmx18g -jar /usr/users/zicola/bin/snpEff/snpEff.jar \
+    -c /usr/users/zicola/bin/snpEff/snpEff.config \
+    Arabidopsis_thaliana subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.vcf \
+    > subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.ann.vcf
+```
+
+Took 6 min. Output file is `subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.ann.vcf`.
+
+The file `snpEff_genes.txt` summarize the number of variants per transcript and variant category. I can import the text file in Excel for easy visualization and sorting.
+
+### Summary variants
+
+```{bash, eval=FALSE}
+# Recover only a subset of the output for easier parsing and reading
+grep -v "##" subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.ann.vcf | \
+  cut -f1,2,4,5,8 | cut -d'|' -f1,2,3,4,5,10,11 | \
+  sed 's/|/\t/g' > summary_SnpEff.txt
+
+```
+
+List of candidate genes at chr5:
+
+```
+AT5G49160
+AT5G21150
+AT5G13960
+AT5G15380
+```
+
+Put gene list in `genes_chr5_mCHG_long_TEs.txt`
+
+```{bash, eval=FALSE}
+
+while read i; do
+  grep $i summary_SnpEff.txt
+done > summary_SnpEff_chr5_candidates.txt < genes_chr5_mCHG_long_TEs.txt
+
+# Get frequencies
+while read i; do
+  pos=$(echo "$i" | cut -f2)
+  grep -P -w "Chr5\t$pos" frequencies_SA.frq
+done < summary_SnpEff_chr5_candidates.txt | cut -f5,6 > summary_SnpEff_chr5_candidates_freq.txt
+
+# Merge summary and frequencies
+paste summary_SnpEff_chr5_candidates.txt summary_SnpEff_chr5_candidates_freq.txt > summary_SnpEff_chr5_candidates_final.txt
+
+rm summary_SnpEff_chr5_candidates.txt summary_SnpEff_chr5_candidates_freq.txt
+```
+
+Import text file `summary_SnpEff_chr5_candidates_final.txt` in Excel (Data > From Text > Tab-separated) => Supplementary Table 11
+
 #.
 
 # Allele status in CPV
@@ -1881,7 +2061,7 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 ```{bash, eval=FALSE}
 
 # This script defines the step to retrieve the allele status for
-# each CPV-SA accessions of the CMT2, ARABIDILLO-1, and VIM2 variants
+# each CPV-SA accessions of the CMT2, FBX5, and VIM2 variants
 
 ################################################################################
 # Packages/Sofwares requires
@@ -1894,12 +2074,12 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 # samtools
 
 ################################################################################
-########## Get VIM2 deletion, ARA1, and CMT2 status
+########## Get VIM2 deletion, FBX5, and CMT2 status
 ################################################################################
 
 # Use VCF file used for GWAS 
 
-VCF="superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz"
+VCF="subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.vcf.gz"
 
 #################################################################
 # FBX5
@@ -2018,7 +2198,7 @@ wc -l VIM3_allele_status.txt
 
 ## Allele distribution by population
 
-Create the python script `find_accession.py` to easily find back an accession name based on its sequencing ID (seqID).
+Create the python script `scripts/find_accession/find_accession.py` to easily find back an accession name based on its sequencing ID (seqID).
 
 ```{bash, eval=FALSE}
 
@@ -3225,21 +3405,24 @@ df_mean_CpG$VIM2 <- as.factor(df_mean_CpG$VIM2)
 
 
 # Highlight Cvi-0 within SA (84th samples in dataframe)
-ggplot(data=df_mean_CpG, aes(location, percent_methylation, fill=VIM2)) + 
-  geom_boxplot(outlier.shape=NA) +
-  geom_point(data=df_mean_CpG[-84,], position=position_jitterdodge(), size=0.5) +
-  geom_jitter(data=df_mean_CpG[84, ],size=2, fill="white", shape=23, width=0.1, height=0) +
+ggplot(data = df_mean_CpG, aes(location, percent_methylation, fill = VIM2)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(data = df_mean_CpG[-84, ], position = position_jitterdodge(), size = 0.5) +
+  geom_jitter(data = df_mean_CpG[84, ], size = 2, fill = "white", shape = 23, width = 0.1, height = 0) +
   ylab("% of methyated cytosines (CG)") +
-  xlab("") + 
-  theme_bw() + 
+  xlab("") +
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_y_continuous(limits=c(0, 18), breaks=seq(0,18,2)) +
-  scale_x_discrete(labels=c("Col-0"="Col-0","Col-0_Stroud"="Col-0","vim1"="vim1-2","vim2"="vim2-1","vim3"="vim3-1","vim123"="vim1-2/vim2-1/vim3-1","SA"="CPV")) +
-scale_fill_manual(values=c("#ffffffff", "#949494ff")) +  theme(axis.text.x = element_text(color="black"), 
-    axis.text.y = element_text(color="black"),
-    axis.ticks = element_line(color = "black")) + 
-    theme(plot.title = element_text(hjust = 0.5)) + 
-    scale_y_continuous(labels = scales::comma_format())
+  scale_y_continuous(limits = c(0, 18), breaks = seq(0, 18, 2)) +
+  scale_x_discrete(labels = c("Col-0" = "Col-0", "Col-0_Stroud" = "Col-0", "vim1" = "vim1-2", "vim2" = "vim2-1", "vim3" = "vim3-1", "vim123" = "vim1-2/vim2-1/vim3-1", "SA" = "CPV")) +
+  scale_fill_manual(values = c("#ffffffff", "#949494ff")) +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks = element_line(color = "black")
+  ) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(labels = scales::comma_format())
 
 ```
 
@@ -3259,33 +3442,38 @@ title <- "Weighted Methylation Level for genes"
 load_df_wml(path_DB, df_name)
 
 # Merge dataframes of methylation levels and df_accessions to get detailed information about dataset
-df_mean <- merge(get(df_name), df_accessions, by="sample")
+df_mean <- merge(get(df_name), df_accessions, by = "sample")
 
 # Keep only CpG context and remove cmt2-5
-df_mean_CpG <- df_mean %>% filter(context=="CpG") %>% filter(location %in% c("Col-0","Col-0_Stroud","vim1","vim2","vim3","vim123","SA"))
+df_mean_CpG <- df_mean %>%
+  filter(context == "CpG") %>%
+  filter(location %in% c("Col-0", "Col-0_Stroud", "vim1", "vim2", "vim3", "vim123", "SA"))
 
 # Arrange by name on the plot
-df_mean_CpG$location <- factor(df_mean_CpG$location, levels = c("Col-0","Col-0_Stroud","vim1","vim2","vim3","vim123","SA"), ordered = TRUE)
+df_mean_CpG$location <- factor(df_mean_CpG$location, levels = c("Col-0", "Col-0_Stroud", "vim1", "vim2", "vim3", "vim123", "SA"), ordered = TRUE)
 
 df_mean_CpG$VIM2 <- as.factor(df_mean_CpG$VIM2)
 
 
 # Highlight Cvi-0 within SA (84th samples in dataframe)
-ggplot(data=df_mean_CpG, aes(location, percent_methylation, fill=VIM2)) + 
-  geom_boxplot(outlier.shape=NA) +
-  geom_point(data=df_mean_CpG[-84,], position=position_jitterdodge(), size=0.5) +
-  geom_jitter(data=df_mean_CpG[84, ],size=2, fill="white", shape=23, width=0.1, height=0) +
+ggplot(data = df_mean_CpG, aes(location, percent_methylation, fill = VIM2)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(data = df_mean_CpG[-84, ], position = position_jitterdodge(), size = 0.5) +
+  geom_jitter(data = df_mean_CpG[84, ], size = 2, fill = "white", shape = 23, width = 0.1, height = 0) +
   ylab("% of methyated cytosines (CG)") +
-  xlab("") + 
-  theme_bw() + 
+  xlab("") +
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_y_continuous(limits=c(0, 18), breaks=seq(0,18,2)) +
-  scale_x_discrete(labels=c("Col-0"="Col-0","Col-0_Stroud"="Col-0","vim1"="vim1-2","vim2"="vim2-1","vim3"="vim3-1","vim123"="vim1-2/vim2-1/vim3-1","SA"="CPV")) +
-scale_fill_manual(values=c("#ffffffff", "#949494ff")) +  theme(axis.text.x = element_text(color="black"), 
-    axis.text.y = element_text(color="black"),
-    axis.ticks = element_line(color = "black")) + 
-    theme(plot.title = element_text(hjust = 0.5)) + 
-    scale_y_continuous(labels = scales::comma_format())
+  scale_y_continuous(limits = c(0, 18), breaks = seq(0, 18, 2)) +
+  scale_x_discrete(labels = c("Col-0" = "Col-0", "Col-0_Stroud" = "Col-0", "vim1" = "vim1-2", "vim2" = "vim2-1", "vim3" = "vim3-1", "vim123" = "vim1-2/vim2-1/vim3-1", "SA" = "CPV")) +
+  scale_fill_manual(values = c("#ffffffff", "#949494ff")) +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks = element_line(color = "black")
+  ) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(labels = scales::comma_format())
 
 ```
 
@@ -3306,33 +3494,38 @@ title <- "Weighted Methylation Level all TEs"
 load_df_wml(path_DB, df_name)
 
 # Merge dataframes of methylation levels and df_accessions to get detailed information about dataset
-df_mean <- merge(get(df_name), df_accessions, by="sample")
+df_mean <- merge(get(df_name), df_accessions, by = "sample")
 
 # Keep only CpG context and remove cmt2-5
-df_mean_CpG <- df_mean %>% filter(context=="CpG") %>% filter(location %in% c("Col-0","Col-0_Stroud","vim1","vim2","vim3","vim123","SA"))
+df_mean_CpG <- df_mean %>%
+  filter(context == "CpG") %>%
+  filter(location %in% c("Col-0", "Col-0_Stroud", "vim1", "vim2", "vim3", "vim123", "SA"))
 
 # Arrange by name on the plot
-df_mean_CpG$location <- factor(df_mean_CpG$location, levels = c("Col-0","Col-0_Stroud","vim1","vim2","vim3","vim123","SA"), ordered = TRUE)
+df_mean_CpG$location <- factor(df_mean_CpG$location, levels = c("Col-0", "Col-0_Stroud", "vim1", "vim2", "vim3", "vim123", "SA"), ordered = TRUE)
 
 df_mean_CpG$VIM2 <- as.factor(df_mean_CpG$VIM2)
 
 
 # Highlight Cvi-0 within SA (84th samples in dataframe)
-ggplot(data=df_mean_CpG, aes(location, percent_methylation, fill=VIM2)) + 
-  geom_boxplot(outlier.shape=NA) +
-  geom_point(data=df_mean_CpG[-84,], position=position_jitterdodge(), size=0.5) +
-  geom_jitter(data=df_mean_CpG[84, ],size=2, fill="white", shape=23, width=0.1, height=0) +
+ggplot(data = df_mean_CpG, aes(location, percent_methylation, fill = VIM2)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(data = df_mean_CpG[-84, ], position = position_jitterdodge(), size = 0.5) +
+  geom_jitter(data = df_mean_CpG[84, ], size = 2, fill = "white", shape = 23, width = 0.1, height = 0) +
   ylab("% of methyated cytosines (CG)") +
-  xlab("") + 
-  theme_bw() + 
+  xlab("") +
+  theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  scale_y_continuous(limits=c(0, 18), breaks=seq(0,18,2)) +
-  scale_x_discrete(labels=c("Col-0"="Col-0","Col-0_Stroud"="Col-0","vim1"="vim1-2","vim2"="vim2-1","vim3"="vim3-1","vim123"="vim1-2/vim2-1/vim3-1","SA"="CPV")) +
-scale_fill_manual(values=c("#ffffffff", "#949494ff")) +  theme(axis.text.x = element_text(color="black"), 
-    axis.text.y = element_text(color="black"),
-    axis.ticks = element_line(color = "black")) + 
-    theme(plot.title = element_text(hjust = 0.5)) + 
-    scale_y_continuous(labels = scales::comma_format())
+  scale_y_continuous(limits = c(0, 18), breaks = seq(0, 18, 2)) +
+  scale_x_discrete(labels = c("Col-0" = "Col-0", "Col-0_Stroud" = "Col-0", "vim1" = "vim1-2", "vim2" = "vim2-1", "vim3" = "vim3-1", "vim123" = "vim1-2/vim2-1/vim3-1", "SA" = "CPV")) +
+  scale_fill_manual(values = c("#ffffffff", "#949494ff")) +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks = element_line(color = "black")
+  ) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(labels = scales::comma_format())
 
 ```
 
@@ -3445,7 +3638,6 @@ list_methylRawLists_TEs_4kb <- load_methylRawListDB(list_DB_paths, type="TEs_4kb
 ## mCG in long TEs for FBX5 mutants
 
 ```{r}
-
 df_name <- "df_mean_TEs_4kb"
 title <- "Weighted Methylation Level for long TEs (>4 kb)"
 
@@ -3455,27 +3647,30 @@ load_df_wml(path_DB, df_name)
 
 
 # Merge dataframes of methylation levels and df_accessions to get detailed information about dataset
-df_mean <- merge(get(df_name), df_accessions, by="sample")
+df_mean <- merge(get(df_name), df_accessions, by = "sample")
 
 
-df_mean_subset <- df_mean %>% filter(context=="CpG") %>% filter(!pool %in% c("cmt2-5","cmt2","S27-204","Cvi-0"))
+df_mean_subset <- df_mean %>%
+  filter(context == "CpG") %>%
+  filter(!pool %in% c("cmt2-5", "cmt2", "S27-204", "Cvi-0"))
 
-order_pool <- c("Col-0","ara1-SALK","ARA1-OE","Col-3","ara1-SAIL","ara12")
+order_pool <- c("Col-0", "ara1-SALK", "ARA1-OE", "Col-3", "ara1-SAIL", "ara12")
 
-df_mean_subset$pool <- factor(df_mean_subset$pool , levels=order_pool, ordered=TRUE)
+df_mean_subset$pool <- factor(df_mean_subset$pool, levels = order_pool, ordered = TRUE)
 
 # Rename samples
 
-ggplot(data=df_mean_subset, aes(x=pool, y=percent_methylation, group=pool)) + 
-  geom_boxplot(outlier.size=1) +
-  geom_jitter(height=.05, width=.05, size=1) +  
+ggplot(data = df_mean_subset, aes(x = pool, y = percent_methylation, group = pool)) +
+  geom_boxplot(outlier.size = 1) +
+  geom_jitter(height = .05, width = .05, size = 1) +
   theme_bw() +
   ylab("% methylated cytosines (CG)") +
   ggtitle("CpG methylation in long TEs") +
-  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(plot.title = element_text(hjust = 0.5)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  xlab("") + scale_y_continuous(limits=c(78, 90), breaks=seq(78,90,2)) +
-  scale_x_discrete(labels=c("Col-0","SALK_082977","FBX5-OE","Col-3","SAIL_190_D02","SAILD_190_D02/arabidillo-2"))
+  xlab("") +
+  scale_y_continuous(limits = c(78, 90), breaks = seq(78, 90, 2)) +
+  scale_x_discrete(labels = c("Col-0", "SALK_082977", "FBX5-OE", "Col-3", "SAIL_190_D02", "SAILD_190_D02/arabidillo-2"))
 
 ```
 
@@ -3494,27 +3689,30 @@ load_df_wml(path_DB, df_name)
 
 
 # Merge dataframes of methylation levels and df_accessions to get detailed information about dataset
-df_mean <- merge(get(df_name), df_accessions, by="sample")
+df_mean <- merge(get(df_name), df_accessions, by = "sample")
 
 
-df_mean_subset <- df_mean %>% filter(context=="CHG") %>% filter(!pool %in% c("cmt2-5","cmt2","S27-204","Cvi-0"))
+df_mean_subset <- df_mean %>%
+  filter(context == "CHG") %>%
+  filter(!pool %in% c("cmt2-5", "cmt2", "S27-204", "Cvi-0"))
 
-order_pool <- c("Col-0","ara1-SALK","ARA1-OE","Col-3","ara1-SAIL","ara12")
+order_pool <- c("Col-0", "ara1-SALK", "ARA1-OE", "Col-3", "ara1-SAIL", "ara12")
 
-df_mean_subset$pool <- factor(df_mean_subset$pool , levels=order_pool, ordered=TRUE)
+df_mean_subset$pool <- factor(df_mean_subset$pool, levels = order_pool, ordered = TRUE)
 
 # Rename samples
 
-ggplot(data=df_mean_subset, aes(x=pool, y=percent_methylation, group=pool)) + 
-  geom_boxplot(outlier.size=1) +
-  geom_jitter(height=.05, width=.05, size=1) +  
+ggplot(data = df_mean_subset, aes(x = pool, y = percent_methylation, group = pool)) +
+  geom_boxplot(outlier.size = 1) +
+  geom_jitter(height = .05, width = .05, size = 1) +
   theme_bw() +
   ylab("% methylated cytosines (CHG)") +
   ggtitle("CHG methylation in long TEs") +
-  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(plot.title = element_text(hjust = 0.5)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  xlab("") + scale_y_continuous(limits=c(40, 48), breaks=seq(40,48,2)) +
-  scale_x_discrete(labels=c("Col-0","SALK_082977","FBX5-OE","Col-3","SAIL_190_D02","SAILD_190_D02/arabidillo-2"))
+  xlab("") +
+  scale_y_continuous(limits = c(40, 48), breaks = seq(40, 48, 2)) +
+  scale_x_discrete(labels = c("Col-0", "SALK_082977", "FBX5-OE", "Col-3", "SAIL_190_D02", "SAILD_190_D02/arabidillo-2"))
 
 ```
 
@@ -3522,8 +3720,6 @@ ggplot(data=df_mean_subset, aes(x=pool, y=percent_methylation, group=pool)) +
 ## mCHH in long TEs for FBX5 mutants
 
 ```{r}
-
-
 df_name <- "df_mean_TEs_4kb"
 title <- "Weighted Methylation Level for long TEs (>4 kb)"
 
@@ -3531,7 +3727,7 @@ get_df_wml(list_methylRawLists_TEs_4kb, path_DB, df_name)
 load_df_wml(path_DB, df_name)
 
 # Merge methylation levels and df_accessions for detailed information
-df_mean <- merge(get(df_name), df_accessions, by="sample")
+df_mean <- merge(get(df_name), df_accessions, by = "sample")
 
 df_mean_subset <- df_mean %>%
   filter(context == "CHH") %>%
@@ -3541,18 +3737,20 @@ order_pool <- c("Col-0", "ara1-SALK", "ARA1-OE", "Col-3", "ara1-SAIL", "ara12")
 
 df_mean_subset$pool <- factor(df_mean_subset$pool, levels = order_pool, ordered = TRUE)
 
-ggplot(data = df_mean_subset, aes(x = pool, y = percent_methylation, group = pool)) + 
+ggplot(data = df_mean_subset, aes(x = pool, y = percent_methylation, group = pool)) +
   geom_boxplot(outlier.size = 1) +
-  geom_jitter(height = .05, width = .05, size = 1) +  
+  geom_jitter(height = .05, width = .05, size = 1) +
   theme_bw() +
   ylab("% methylated cytosines (CHH)") +
   ggtitle("CHH methylation in long TEs") +
-  theme(plot.title = element_text(hjust = 0.5)) + 
+  theme(plot.title = element_text(hjust = 0.5)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  xlab("") + 
+  xlab("") +
   scale_y_continuous(limits = c(8, 14), breaks = seq(8, 14, 2)) +
-  scale_x_discrete(labels = c("Col-0", "SALK_082977", "FBX5-OE", "Col-3", 
-                              "SAIL_190_D02", "SAILD_190_D02/arabidillo-2"))
+  scale_x_discrete(labels = c(
+    "Col-0", "SALK_082977", "FBX5-OE", "Col-3",
+    "SAIL_190_D02", "SAILD_190_D02/arabidillo-2"
+  ))
 
 ```
 
@@ -3850,7 +4048,7 @@ mean of x mean of y
 
 ```{r, fig.width=14, fig.height=5}
 
-df_accessions <- read.table("data/df_accessions_all.txt", header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
+df_accessions <- read.table("data/df_accessions_all.txt", header = TRUE, sep = "\t", stringsAsFactors = TRUE, na.strings = "")
 
 path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
 
@@ -3862,56 +4060,64 @@ get_df_wml(list_methylRawLists_TEs_4kb, path_DB, df_name)
 load_df_wml(path_DB, df_name)
 
 # Merge dataframes of methylation levels and df_accessions to get detailed information about dataset
-df_mean <- merge(get(df_name), df_accessions, by="sample")
+df_mean <- merge(get(df_name), df_accessions, by = "sample")
 
 # Keep only CHH
-df_mean_formated_CHH <- df_mean %>% filter(context == "CHH") %>% filter(location %in% c("Col-3","cmt2-5","SA")) %>% filter(!sample %in% c("4220_AE_cmt2-5","3427_C_Col-0","3599_A_Col-0","4220_Z_Col-0","4220_AG_Col-3"))
+df_mean_formated_CHH <- df_mean %>%
+  filter(context == "CHH") %>%
+  filter(location %in% c("Col-3", "cmt2-5", "SA")) %>%
+  filter(!sample %in% c("4220_AE_cmt2-5", "3427_C_Col-0", "3599_A_Col-0", "4220_Z_Col-0", "4220_AG_Col-3"))
 
 # Arrange by name on the plot
-df_mean_formated_CHH$location <- factor(df_mean_formated_CHH$location, levels = c("Col-3","cmt2-5","SA"), ordered = TRUE)
+df_mean_formated_CHH$location <- factor(df_mean_formated_CHH$location, levels = c("Col-3", "cmt2-5", "SA"), ordered = TRUE)
 
 df_mean_formated_CHH$CMT2 <- as.factor(df_mean_formated_CHH$CMT2)
 
 # Create new variable to separate SA with CMT2stop and CMT2ref on the plot
-df_SA_CMT2ref <- df_mean_formated_CHH %>% filter(location=="SA", CMT2==0)
+df_SA_CMT2ref <- df_mean_formated_CHH %>% filter(location == "SA", CMT2 == 0)
 df_SA_CMT2ref$pool <- "SA_CMT2ref"
 
-df_SA_CMT2stop <- df_mean_formated_CHH %>% filter(location=="SA", CMT2==1)
+df_SA_CMT2stop <- df_mean_formated_CHH %>% filter(location == "SA", CMT2 == 1)
 df_SA_CMT2stop$pool <- "SA_CMT2stop"
 
-df_col <- df_mean_formated_CHH %>% filter(location=="Col-3")
+df_col <- df_mean_formated_CHH %>% filter(location == "Col-3")
 df_col$pool <- "Col-3"
 
-df_cmt2 <- df_mean_formated_CHH %>% filter(location=="cmt2-5")
+df_cmt2 <- df_mean_formated_CHH %>% filter(location == "cmt2-5")
 df_cmt2$pool <- "cmt2-5"
 
 # Rejoin dataframe
 df_mean_formated_CHH <- rbind(df_SA_CMT2ref, df_SA_CMT2stop, df_col, df_cmt2)
 
 # Reorder factor
-df_mean_formated_CHH$pool <- factor(df_mean_formated_CHH$pool, levels=c("SA_CMT2ref","SA_CMT2stop","Col-3","cmt2-5"))
+df_mean_formated_CHH$pool <- factor(df_mean_formated_CHH$pool, levels = c("SA_CMT2ref", "SA_CMT2stop", "Col-3", "cmt2-5"))
 
 # Where Cvi-0 is
 which(grepl("4220_Y_Cvi-0", df_mean_formated_CHH$sample))
 # 56
 
-give.n <- function(x){
+give.n <- function(x) {
   return(c(y = mean(x), label = length(x)))
 }
 
-ggplot(data=df_mean_formated_CHH, aes(x=pool, y=percent_methylation))+ 
-  geom_boxplot(outlier.shape=NA)  + 
-  geom_jitter(data=df_mean_formated_CHH[-56, ],height=.05, width=.05, size=0.8) +
-  geom_jitter(data=df_mean_formated_CHH[56,], size=2, fill="white", shape=23, width=0.1, height=0) +
-  ylab("% of methylated cytosines (CHH)") + ggtitle("CHH methylation in long TEs") +
-  xlab("") + theme_bw() + scale_y_continuous(limits=c(0, 14), breaks=seq(0,14,2)) + 
+ggplot(data = df_mean_formated_CHH, aes(x = pool, y = percent_methylation)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(data = df_mean_formated_CHH[-56, ], height = .05, width = .05, size = 0.8) +
+  geom_jitter(data = df_mean_formated_CHH[56, ], size = 2, fill = "white", shape = 23, width = 0.1, height = 0) +
+  ylab("% of methylated cytosines (CHH)") +
+  ggtitle("CHH methylation in long TEs") +
+  xlab("") +
+  theme_bw() +
+  scale_y_continuous(limits = c(0, 14), breaks = seq(0, 14, 2)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  stat_summary(fun.data = give.n, geom = "text", position = position_stack(vjust = 0)) +  
-  theme(axis.text.x = element_text(color="black"), 
-      axis.text.y = element_text(color="black"),
-      axis.ticks = element_line(color = "black")) + 
-      theme(plot.title = element_text(hjust = 0.5)) + 
-      scale_y_continuous(labels = scales::comma_format())
+  stat_summary(fun.data = give.n, geom = "text", position = position_stack(vjust = 0)) +
+  theme(
+    axis.text.x = element_text(color = "black"),
+    axis.text.y = element_text(color = "black"),
+    axis.ticks = element_line(color = "black")
+  ) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(labels = scales::comma_format())
 
 ```
 
@@ -4099,28 +4305,34 @@ get_df_wml(list_methylRawLists_TEs_4kb, path_DB, df_name)
 
 load_df_wml(path_DB, df_name)
 
-df_mean_TEs_4kb <- df_mean_TEs_4kb %>% filter(sample %in% as.vector(paste(list_samples,"_TEs_4kb", sep="")))
+df_mean_TEs_4kb <- df_mean_TEs_4kb %>% filter(sample %in% as.vector(paste(list_samples, "_TEs_4kb", sep = "")))
 
 # Create a vector of 3 times the genotype names
 
 # Create variable without the rep
-groups <-  df_accessions %>% separate(genotype, c("genotype","rep"),"_rep") %>% mutate_at("genotype", as.factor) %>% pull("genotype")
+groups <- df_accessions %>%
+  separate(genotype, c("genotype", "rep"), "_rep") %>%
+  mutate_at("genotype", as.factor) %>%
+  pull("genotype")
 
 # add genotype
 df_mean_TEs_4kb$genotype <- groups
 
 
-df_mean_TEs_4kb$sample <- rep(df_accessions$genotype,3)
+df_mean_TEs_4kb$sample <- rep(df_accessions$genotype, 3)
 
 # Plot (use get() to pass the string name of the dataframe as a R object)
 # For CG
-df_fbx5_CG <- df_mean_TEs_4kb %>% filter(genotype %in% c("fbx5_8_9", "fbx5_3_23","fbx5_12_3","S7_B5")) %>% filter(context == "CpG") %>% droplevels()
+df_fbx5_CG <- df_mean_TEs_4kb %>%
+  filter(genotype %in% c("fbx5_8_9", "fbx5_3_23", "fbx5_12_3", "S7_B5")) %>%
+  filter(context == "CpG") %>%
+  droplevels()
 
 # Put WT sample as control
-df_fbx5_CG$genotype <- factor(df_fbx5_CG$genotype, levels= c("S7_B5","fbx5_8_9","fbx5_12_3","fbx5_3_23"), ordered=TRUE)
+df_fbx5_CG$genotype <- factor(df_fbx5_CG$genotype, levels = c("S7_B5", "fbx5_8_9", "fbx5_12_3", "fbx5_3_23"), ordered = TRUE)
 
 
-ggboxplot(df_fbx5_CG, x="genotype",y="percent_methylation", add = "jitter", title = "CpG methylation in long TEs") + theme(plot.title = element_text(hjust = 0.5))+ theme(axis.text.x = element_text(angle=90, hjust=1)) + theme_bw()+ theme(plot.title = element_text(hjust = 0.5)) + scale_x_discrete(labels=c("S7-B5","fbx5-1","fbx5-2","fbx5-3"))
+ggboxplot(df_fbx5_CG, x = "genotype", y = "percent_methylation", add = "jitter", title = "CpG methylation in long TEs") + theme(plot.title = element_text(hjust = 0.5)) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme_bw() + theme(plot.title = element_text(hjust = 0.5)) + scale_x_discrete(labels = c("S7-B5", "fbx5-1", "fbx5-2", "fbx5-3"))
 
 ```
 
@@ -4155,34 +4367,41 @@ fbx5_3_23 - S7_B5 == 0   1.0833     0.4066   2.664  0.06841 .
 ```{r, fig.width=14, fig.height=5}
 
 df_name <- "df_mean_TEs_4kb"
+
 title <- "Weighted Methylation Level for long TEs"
 
 get_df_wml(list_methylRawLists_TEs_4kb, path_DB, df_name)
 
 load_df_wml(path_DB, df_name)
 
-df_mean_TEs_4kb <- df_mean_TEs_4kb %>% filter(sample %in% as.vector(paste(list_samples,"_TEs_4kb", sep="")))
+df_mean_TEs_4kb <- df_mean_TEs_4kb %>% filter(sample %in% as.vector(paste(list_samples, "_TEs_4kb", sep = "")))
 
 # Create a vector of 3 times the genotype names
 
 # Create variable without the rep
-groups <-  df_accessions %>% separate(genotype, c("genotype","rep"),"_rep") %>% mutate_at("genotype", as.factor) %>% pull("genotype")
+groups <- df_accessions %>%
+  separate(genotype, c("genotype", "rep"), "_rep") %>%
+  mutate_at("genotype", as.factor) %>%
+  pull("genotype")
 
 # add genotype
 df_mean_TEs_4kb$genotype <- groups
 
 
-df_mean_TEs_4kb$sample <- rep(df_accessions$genotype,3)
+df_mean_TEs_4kb$sample <- rep(df_accessions$genotype, 3)
 
 # Plot (use get() to pass the string name of the dataframe as a R object)
 # For CG
-df_fbx5_CHG <- df_mean_TEs_4kb %>% filter(genotype %in% c("fbx5_8_9", "fbx5_3_23","fbx5_12_3","S7_B5")) %>% filter(context == "CHG") %>% droplevels()
+df_fbx5_CHG <- df_mean_TEs_4kb %>%
+  filter(genotype %in% c("fbx5_8_9", "fbx5_3_23", "fbx5_12_3", "S7_B5")) %>%
+  filter(context == "CHG") %>%
+  droplevels()
 
 # Put WT sample as control
-df_fbx5_CHG$genotype <- factor(df_fbx5_CHG$genotype, levels= c("S7_B5","fbx5_8_9","fbx5_12_3","fbx5_3_23"), ordered=TRUE)
+df_fbx5_CHG$genotype <- factor(df_fbx5_CHG$genotype, levels = c("S7_B5", "fbx5_8_9", "fbx5_12_3", "fbx5_3_23"), ordered = TRUE)
 
 
-ggboxplot(df_fbx5_CHG, x="genotype",y="percent_methylation", add = "jitter", title = "CHG methylation in long TEs") + theme(plot.title = element_text(hjust = 0.5))+ theme(axis.text.x = element_text(angle=90, hjust=1)) + theme_bw()+ theme(plot.title = element_text(hjust = 0.5)) + scale_x_discrete(labels=c("S7-B5","fbx5-1","fbx5-2","fbx5-3"))
+ggboxplot(df_fbx5_CHG, x = "genotype", y = "percent_methylation", add = "jitter", title = "CHG methylation in long TEs") + theme(plot.title = element_text(hjust = 0.5)) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme_bw() + theme(plot.title = element_text(hjust = 0.5)) + scale_x_discrete(labels = c("S7-B5", "fbx5-1", "fbx5-2", "fbx5-3"))
 
 ```
 
@@ -4218,33 +4437,40 @@ fbx5_3_23 - S7_B5 == 0   0.7800     1.3100   0.595    0.881
 ```{r, fig.width=14, fig.height=5}
 
 df_name <- "df_mean_TEs_4kb"
+
 title <- "Weighted Methylation Level for long TEs"
 
 get_df_wml(list_methylRawLists_TEs_4kb, path_DB, df_name)
 
 load_df_wml(path_DB, df_name)
 
-df_mean_TEs_4kb <- df_mean_TEs_4kb %>% filter(sample %in% as.vector(paste(list_samples,"_TEs_4kb", sep="")))
+df_mean_TEs_4kb <- df_mean_TEs_4kb %>% filter(sample %in% as.vector(paste(list_samples, "_TEs_4kb", sep = "")))
 
 # Create a vector of 3 times the genotype names
 
 # Create variable without the rep
-groups <-  df_accessions %>% separate(genotype, c("genotype","rep"),"_rep") %>% mutate_at("genotype", as.factor) %>% pull("genotype")
+groups <- df_accessions %>%
+  separate(genotype, c("genotype", "rep"), "_rep") %>%
+  mutate_at("genotype", as.factor) %>%
+  pull("genotype")
 
 # add genotype
 df_mean_TEs_4kb$genotype <- groups
 
 
-df_mean_TEs_4kb$sample <- rep(df_accessions$genotype,3)
+df_mean_TEs_4kb$sample <- rep(df_accessions$genotype, 3)
 
 # Plot (use get() to pass the string name of the dataframe as a R object)
-df_fbx5_CHH <- df_mean_TEs_4kb %>% filter(genotype %in% c("fbx5_8_9", "fbx5_3_23","fbx5_12_3","S7_B5")) %>% filter(context == "CHH") %>% droplevels()
+df_fbx5_CHH <- df_mean_TEs_4kb %>%
+  filter(genotype %in% c("fbx5_8_9", "fbx5_3_23", "fbx5_12_3", "S7_B5")) %>%
+  filter(context == "CHH") %>%
+  droplevels()
 
 # Put WT sample as control
-df_fbx5_CHH$genotype <- factor(df_fbx5_CHH$genotype, levels= c("S7_B5","fbx5_8_9","fbx5_12_3","fbx5_3_23"), ordered=TRUE)
+df_fbx5_CHH$genotype <- factor(df_fbx5_CHH$genotype, levels = c("S7_B5", "fbx5_8_9", "fbx5_12_3", "fbx5_3_23"), ordered = TRUE)
 
 
-ggboxplot(df_fbx5_CHH, x="genotype",y="percent_methylation", add = "jitter", title = "CHH methylation in long TEs") + theme(plot.title = element_text(hjust = 0.5))+ theme(axis.text.x = element_text(angle=90, hjust=1)) + theme_bw()+ theme(plot.title = element_text(hjust = 0.5)) + scale_x_discrete(labels=c("S7-B5","fbx5-1","fbx5-2","fbx5-3"))
+ggboxplot(df_fbx5_CHH, x = "genotype", y = "percent_methylation", add = "jitter", title = "CHH methylation in long TEs") + theme(plot.title = element_text(hjust = 0.5)) + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + theme_bw() + theme(plot.title = element_text(hjust = 0.5)) + scale_x_discrete(labels = c("S7-B5", "fbx5-1", "fbx5-2", "fbx5-3"))
 
 ```
 
@@ -4664,29 +4890,36 @@ all(colnames(cts) == rownames(coldata))
 
 
 ```{r}
-dds <- DESeqDataSetFromMatrix(countData = cts,
-                              colData = coldata,
-                              design= ~1)
+dds <- DESeqDataSetFromMatrix(
+  countData = cts,
+  colData = coldata,
+  design = ~1
+)
 
 # Keep only genes with at least 10 reads
 keep <- rowSums(counts(dds)) >= 10
-dds <- dds[keep,]
+dds <- dds[keep, ]
 
 dds <- DESeq(dds)
 
 # Variance stabilizing transformation
-vsd <- vst(dds, blind=FALSE)
+vsd <- vst(dds, blind = FALSE)
 
 # Create PCA
-pcaData <- DESeq2::plotPCA(vsd, intgroup=c("sample"), returnData=TRUE)
+pcaData <- DESeq2::plotPCA(vsd, intgroup = c("sample"), returnData = TRUE)
 
 # Create a population variable by spliting sample
-pcaData2 <- pcaData %>% separate(group, c("population","second","third"), "_") %>% select(PC1,PC2,population,sample,name)
+pcaData2 <- pcaData %>%
+  separate(group, c("population", "second", "third"), "_") %>%
+  select(PC1, PC2, population, sample, name)
 
 # Get percentage variation
 percentVar <- round(100 * attr(pcaData, "percentVar"))
 
-p <- ggplot(pcaData2, aes(PC1, PC2, color=population, label = sample)) +  xlab(paste0("PC1: ",percentVar[1],"% variance")) + ylab(paste0("PC2: ",percentVar[2],"% variance")) +  theme_bw()
+p <- ggplot(pcaData2, aes(PC1, PC2, color = population, label = sample)) +
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+  theme_bw()
 
 p + geom_text(size = 4) + ggtitle("PCA RNA-seq (136 samples)") + theme(plot.title = element_text(hjust = 0.5))
 
@@ -4740,26 +4973,33 @@ all(colnames(cts_rep) == rownames(coldata_rep))
 Check distribution of replicates in a PCA
 
 ```{r}
-dds <- DESeqDataSetFromMatrix(countData = cts_rep,
-                              colData = coldata_rep,
-                              design= ~1)
+dds <- DESeqDataSetFromMatrix(
+  countData = cts_rep,
+  colData = coldata_rep,
+  design = ~1
+)
 
 # Keep only genes with at least 10 reads
 keep <- rowSums(counts(dds)) >= 10
-dds <- dds[keep,]
+dds <- dds[keep, ]
 
 dds <- DESeq(dds)
 
 # Variance stabilizing transformation
-vsd <- vst(dds, blind=FALSE)
+vsd <- vst(dds, blind = FALSE)
 
 # Create PCA
-pcaData <- DESeq2::plotPCA(vsd, intgroup=c("sample"), returnData=TRUE)
+pcaData <- DESeq2::plotPCA(vsd, intgroup = c("sample"), returnData = TRUE)
 
 # Get percentage variation
 percentVar <- round(100 * attr(pcaData, "percentVar"))
 
-p <- ggplot(pcaData, aes(PC1, PC2, color=sample, label = sample)) +  xlab(paste0("PC1: ",percentVar[1],"% variance")) + ylab(paste0("PC2: ",percentVar[2],"% variance")) +  theme_bw()+  theme(legend.title = element_blank()) + theme(legend.position = "none")
+p <- ggplot(pcaData, aes(PC1, PC2, color = sample, label = sample)) +
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+  theme_bw() +
+  theme(legend.title = element_blank()) +
+  theme(legend.position = "none")
 
 p + geom_text(size = 4) + ggtitle("PCA RNA-seq replicates") + theme(plot.title = element_text(hjust = 0.5))
 
@@ -4777,7 +5017,10 @@ Remove Col-0 4559_C and keep first replicate for each accessions with replicates
 
 ```{r}
 # Remove Col-0
-coldata_filtered <- coldata  %>% distinct(sample, .keep_all = TRUE) %>% filter(sample!="Col_0") %>% droplevels
+coldata_filtered <- coldata %>%
+  distinct(sample, .keep_all = TRUE) %>%
+  filter(sample != "Col_0") %>%
+  droplevels()
 
 # I end up with 136 lines
 
@@ -4795,12 +5038,14 @@ rm(coldata_filtered, cts_filtered)
 ### DEG analysis by VIM2 allele
 
 ```{r}
-dds <- DESeqDataSetFromMatrix(countData = cts,
-                              colData = coldata,
-                              design= ~ VIM2)
+dds <- DESeqDataSetFromMatrix(
+  countData = cts,
+  colData = coldata,
+  design = ~VIM2
+)
 
 keep <- rowSums(counts(dds)) >= 10
-dds <- dds[keep,]
+dds <- dds[keep, ]
 
 ## Generate expression model
 # Get the read count and perform 3 steps: estimation of size factors, estimation of dispersion
@@ -4810,13 +5055,15 @@ dds <- DESeq(dds)
 # Create a DESeqResults object
 res <- results(dds)
 
-sum(res$padj < 0.05, na.rm=TRUE)
+sum(res$padj < 0.05, na.rm = TRUE)
 
 DEG <- as.data.frame(res) %>% rownames_to_column("geneID")
 
-sigDEG <- as.data.frame(res) %>% rownames_to_column("geneID") %>% filter(padj < 0.05)
+sigDEG <- as.data.frame(res) %>%
+  rownames_to_column("geneID") %>%
+  filter(padj < 0.05)
 
-write.table(sigDEG, "data/significant_94_DEGs_VIM2.txt", quote=FALSE, row.names=FALSE, sep="\t")
+write.table(sigDEG, "data/significant_94_DEGs_VIM2.txt", quote = FALSE, row.names = FALSE, sep = "\t")
 
 
 ```
@@ -4856,15 +5103,18 @@ EnhancedVolcano(res,
 
 ```{r}
 # Variance stabilizing transformation
-vsd <- vst(dds, blind=FALSE)
+vsd <- vst(dds, blind = FALSE)
 
 # Create PCA
-pcaData <- plotPCA(vsd, intgroup=c("sample", "VIM2"), returnData=TRUE)
+pcaData <- plotPCA(vsd, intgroup = c("sample", "VIM2"), returnData = TRUE)
 
 # Get percentage variation
 percentVar <- round(100 * attr(pcaData, "percentVar"))
 
-p <- ggplot(pcaData, aes(PC1, PC2, color=VIM2, label = sample)) +  xlab(paste0("PC1: ",percentVar[1],"% variance")) + ylab(paste0("PC2: ",percentVar[2],"% variance")) +  theme_bw()
+p <- ggplot(pcaData, aes(PC1, PC2, color = VIM2, label = sample)) +
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+  theme_bw()
 
 p + geom_text(size = 3) + ggtitle("PCA RNA-seq 97 samples") + theme(plot.title = element_text(hjust = 0.5))
 
@@ -4912,13 +5162,17 @@ permutate_deseq2 <- function(allele_name, cts, coldata) {
 ```{r}
 
 # Create a population variable by spliting sample
-coldata_pop <- coldata %>% separate(sample, c("population","second","third"), "_") %>% dplyr::select(population)
+coldata_pop <- coldata %>%
+  separate(sample, c("population", "second", "third"), "_") %>%
+  dplyr::select(population)
 coldata$population <- coldata_pop$population
 coldata$population <- as.factor(coldata$population)
 coldata <- coldata %>% dplyr::select(seqID, sample, population, everything())
 
-permutation_DEG_VIM2 <- vector(mode="list",length=100)
-for(i in 1:100){permutation_DEG_VIM2[i] <- permutate_deseq2("VIM2", cts, coldata)}
+permutation_DEG_VIM2 <- vector(mode = "list", length = 100)
+for (i in 1:100) {
+  permutation_DEG_VIM2[i] <- permutate_deseq2("VIM2", cts, coldata)
+}
 
 saveRDS(permutation_DEG_VIM2, "data/permutation_DEG_VIM2.Rds")
 
@@ -4931,27 +5185,28 @@ saveRDS(permutation_DEG_VIM2, "data/permutation_DEG_VIM2.Rds")
 
 ```{r}
 
-plot_permutation <- function(vector_permutation, observed_value){
+plot_permutation <- function(vector_permutation, observed_value) {
+  observed_value <- as.integer(observed_value)
+  vector_permutation <- as.vector(vector_permutation)
 
-observed_value <- as.integer(observed_value)
-vector_permutation <- as.vector(vector_permutation)
+  df <- as.data.frame(matrix(nrow = (length(vector_permutation) + 1), ncol = 1))
 
-df <- as.data.frame(matrix(nrow=(length(vector_permutation)+1), ncol=1))
+  names(df) <- "value"
 
-names(df) <- "value"
+  df$value <- as.integer(c(observed_value, vector_permutation))
 
-df$value <- as.integer(c(observed_value, vector_permutation))
-
-ggplot(df, aes(x="",y=value)) + 
-  geom_boxplot(outlier.shape = NA) + 
-  geom_point(position=position_jitter()) + 
-  theme_bw() + 
-  ylab("Number of significant DEGs") + 
-  xlab("") + 
-  geom_hline(yintercept=observed_value) + 
-  theme(axis.text.x = element_text(color="black"), 
-        axis.text.y = element_text(color="black"),
-        axis.ticks = element_line(color = "black"))
+  ggplot(df, aes(x = "", y = value)) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_point(position = position_jitter()) +
+    theme_bw() +
+    ylab("Number of significant DEGs") +
+    xlab("") +
+    geom_hline(yintercept = observed_value) +
+    theme(
+      axis.text.x = element_text(color = "black"),
+      axis.text.y = element_text(color = "black"),
+      axis.ticks = element_line(color = "black")
+    )
 }
 
 ```
@@ -4971,7 +5226,6 @@ Combine read counts for *VIM2* and *VIM4* as they are too similar to be able to 
 
 ```{r}
 # Get data
-
 # Get data
 vim2 <- plotCounts(dds, gene = "AT1G66050", intgroup = "VIM2", main = "VIM2", returnData = T)
 vim4 <- plotCounts(dds, gene = "AT1G66040", intgroup = "VIM2", main = "VIM2", returnData = T)
@@ -5015,12 +5269,12 @@ table(vim24$VIM2)
 library(onewaytests)
 
 # Test if variances equals
-bartlett.test(VIM24_count~VIM2, data=vim24)
+bartlett.test(VIM24_count ~ VIM2, data = vim24)
 
 # Variance homogenous
 
 # Do t-test (two-tailed)
-with(vim24, t.test(VIM24_count[VIM2=="0"], VIM24_count[VIM2=="1"], var.equal=TRUE))
+with(vim24, t.test(VIM24_count[VIM2 == "0"], VIM24_count[VIM2 == "1"], var.equal = TRUE))
 
 ```
 
@@ -5125,25 +5379,33 @@ ggboxplot(vim3, y = "count", x = "VIM3", add = "jitter", title = "VIM3") + theme
 
 ```{r}
 
-dds <- DESeqDataSetFromMatrix(countData = cts,
-                              colData = coldata,
-                              design= ~ VIM2)
+dds <- DESeqDataSetFromMatrix(
+  countData = cts,
+  colData = coldata,
+  design = ~VIM2
+)
 
 keep <- rowSums(counts(dds)) >= 10
-dds <- dds[keep,]
+dds <- dds[keep, ]
 
-plotCounts(dds, gene="AT5G39550", intgroup="VIM2", 
-                           main = "VIM3 based on VIM2 allele", returnData = F)
+plotCounts(dds,
+  gene = "AT5G39550", intgroup = "VIM2",
+  main = "VIM3 based on VIM2 allele", returnData = F
+)
 
-dds <- DESeqDataSetFromMatrix(countData = cts,
-                              colData = coldata,
-                              design= ~ VIM3)
+dds <- DESeqDataSetFromMatrix(
+  countData = cts,
+  colData = coldata,
+  design = ~VIM3
+)
 
 keep <- rowSums(counts(dds)) >= 10
-dds <- dds[keep,]
+dds <- dds[keep, ]
 
-plotCounts(dds, gene="AT5G39550", intgroup="VIM3", 
-                           main = "VIM3 based on VIM3 allele", returnData = F)
+plotCounts(dds,
+  gene = "AT5G39550", intgroup = "VIM3",
+  main = "VIM3 based on VIM3 allele", returnData = F
+)
 
 ```
 #.
@@ -5152,7 +5414,7 @@ plotCounts(dds, gene="AT5G39550", intgroup="VIM3",
 
 ## R Libraries
 
-```{r, warning=FALSE, echo=FALSE}
+```{r}
 # RNA-seq analysis
 library(DESeq2)
 
@@ -5840,7 +6102,6 @@ plot_permutation <- function(vector_permutation, observed_value, ylab) {
 ```{r}
 permutation_CMT2 <- readRDS("data/permutation_TE_CMT2.Rds")
 
-
 sig_TE_CMT2 <- read.table("data/significant_38_TEs_CMT2.txt", header = T)
 sum(sig_TE_CMT2$log2FoldChange > 2)
 # 9
@@ -5848,7 +6109,6 @@ sum(sig_TE_CMT2$log2FoldChange > 2)
 nb_up_CMT2 <- as.vector(lapply(permutation_CMT2, function(x) sum(x$log2FoldChange > 2)))
 
 p1 <- plot_permutation(nb_up_CMT2, 9, ylab = "# TEs log2FC > 2") + ggtitle("Permutation CMT2") + theme(plot.title = element_text(hjust = 0.5))
-
 
 permutation_FBX5 <- readRDS("data/permutation_TE_FBX5.Rds")
 
@@ -5861,7 +6121,6 @@ nb_down_FBX5 <- as.vector(lapply(permutation_FBX5, function(x) sum(x$log2FoldCha
 p2 <- plot_permutation(nb_down_FBX5, 3, ylab = "# TEs log2FC < -2") + ggtitle("Permutation FBX5") + theme(plot.title = element_text(hjust = 0.5))
 
 grid.arrange(p1, p2, nrow = 1)
-
 
 ```
 
