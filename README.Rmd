@@ -1214,45 +1214,50 @@ ggplot(data=df_subset, aes(x=country_code, y=percent_methylation)) + geom_boxplo
 
 # GWAS analysis
 
-GWAS was performed as described in this repository: https://github.com/johanzi/gwas_gemma
 
-The script `run_gwas_gemma.sh` can be downloaded from GitHub [gwas_gemma](https://github.com/johanzi/gwas_gemma) repository:
+## Download raw fastq reads
 
-```{bash}
-git clone https://github.com/johanzi/gwas_gemma
-```
-
-
-## SNP calling with the SHORE pipeline
-
-### Required softwares
-
-* BWA (0.7.5 used)
-* SHORE (0.9.3 used)
-* VCFTOOLS (0.1.14 used)
-* SRA toolkit
-
-This pipeline is based on SHORE ([Ossowski et al., 2008](https://genome.cshlp.org/content/18/12/2024.long)). Check documentation [here](http://shore.sourceforge.net/wiki/). The pipeline described here derived from [Durvasula et al., 2017](https://www.pnas.org/content/114/20/5213) with minor modifications.
-
-The documentation here is derived from https://github.com/HancockLab/SNP_calling_Arabidopsis?tab=readme-ov-file#shore-pipeline.
-
-### Download raw fastq reads
-
-The paired-end sequencing data of the 189 CVI accessions from Santo Antao were published in [Fulgione et al 2022](https://www.nature.com/articles/s41467-022-28800-z) and are available in ENA (accession code PRJEB39079 https://www.ebi.ac.uk/ena/browser/view/PRJEB39079).
+The paired-end sequencing data of the 189 CVI accessions from Santo Antao were published in Fulgione et al., 2022 (DOI: 10.1038/s41467-022-28800-z) and are available in ENA (accession code PRJEB39079 https://www.ebi.ac.uk/ena/browser/view/PRJEB39079). The accession Cvi-0 was sequenced and published in Alonso-Blanco et al., 2016 (DOI: 10.1016/j.cell.2016.05.063) and is available in the NCBI BioProject PRJNA273563.
 
 Data can be downloaded using fasterq-dump from SRA toolkit:
 
 ```{bash, eval=FALSE}
 
-# Install SRA toolkit if needed
-conda install -c bioconda sra-tools
+# Install SRA toolkit if needed (v3.2.1 used)
+wget --output-document sratoolkit.tar.gz https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/current/sratoolkit.current-ubuntu64.tar.gz
 
-while read i; do
-  accession_ID=$(echo "$i" | cut -f1)
-  echo "fasterq-dump $accession_ID -S -e 6 --split-files -O output_dir/"
-  fasterq-dump $accession_ID -S -e 6 --split-files -O output_dir/
-done < <(grep "^ERR" data/WGS_ENA_data_189_SA.txt)
+tar -vxzf sratoolkit.tar.gz
+# Add path to binaries to .bashrc
+#export PATH="${PATH}:/usr/users/zicola/bin/sratoolkit.3.2.1-ubuntu64/bin"
 
+fasterq-dump --version
+fasterq-dump : 3.2.1
+
+```
+
+
+```{bash, eval=FALSE}
+#!/bin/bash
+#
+#SBATCH --job-name=download_fastq
+#SBATCH --partition=medium
+#SBATCH --mem=16G
+#SBATCH --time=02:00:00
+#SBATCH --cpus-per-task=6
+#SBATCH --output=slurm/%x.%A.%a.out
+#SBATCH --error=slurm/%x.%A.%a.err
+#SBATCH --mail-type=END
+#SBATCH --mail-user=johan.zicola@uni-goettingen.de
+#SBATCH --array=1-189
+
+accession_ID=$(sed -n ${SLURM_ARRAY_TASK_ID}p WGS_ENA_data_189_SA.txt | cut -f1)
+
+fasterq-dump $accession_ID --threads 6 --split-files -O raw_fastq/
+
+```
+
+```{bash, eval=FALSE}
+sbatch run_download.sh
 ```
 
 -S: skip technical reads
@@ -1260,114 +1265,13 @@ done < <(grep "^ERR" data/WGS_ENA_data_189_SA.txt)
 --split-files: splits into _1.fastq and _2.fastq
 -O output_dir/: specify output directory
 
-
-### Alignment
-
-The first step is to align the data on a reference genome. In this case, we use the TAIR10 reference for *Arabidopsis thaliana* (accession Col-0). The fasta file can be downloaded on the TAIR10 website:
-
-```{bash, eval=FALSE}
-# Download fasta file
-wget https://www.arabidopsis.org/download_files/Genes/TAIR10_genome_release/TAIR10_chromosome_files/TAIR10_chr_all.fas
-```
-
-### Generate index files for BWA
-
-We used BWA for aligning the reads. Check pros and cons for different aligner on [SHORE wiki](http://shore.sourceforge.net/wiki/index.php/Supported_Short_Read_Aligners).
-
-```{bash, eval=FALSE}
-# Index fasta file of the reference genome (here <reference.fa> should 
-# be the TAIR10_chr_all.fas file generated above)
-bwa index -a bwtsw <reference.fa>
-``` 
-
-### Perform the alignment
-
-All data used to call SNPs were paired-end.
-
-```{bash, eval=FALSE}
-# Align the first read of the pairs
-bwa aln -n 0.1 -o 1 <reference.fa>  <fastq_file_read_1.fastq> -f <fastq_file_read_1.fastq.sai> 
-
-# Align the second read of the pairs
-bwa aln -n 0.1 -o 1 <reference.fa>  <fastq_file_read_2.fastq> -f <fastq_file_read_1.fastq.sai> 
-
-# Repetitive read pairs will be placed randomly. The maximum insert size is 500 bp
-bwa sampe -a 500 -r "@RG\tID:$SAMPLE_NAME\tSM:$SAMPLE_NAME" <TAIR10.fa> \
-	<fastq_file_read_1.fastq.sai> <fastq_file_read_2.fastq.sai> \
-	 <fastq_file_read_1.fastq>  <fastq_file_read_2.fastq> > <alignment.sam>  
-```
-
-### Convert SAM file to MapList format
-
-SHORE cannot process the SAM file derived from the BWA alignment but uses a MapList file. Check [here](http://shore.sourceforge.net/wiki/index.php/SHORE_File_Formats) for more information on SHORE formats.
-
-```{bash, eval=FALSE}
-# Convert SAM to MapList format 
-shore convert Alignment2Maplist <alignment.sam> --refseq <reference.fa> > <alignment.map.list>
-
-# Sort the MapList file
-shore sort --preset maplist --infiles <file.map.list> --inplace
-```
-
-### Convert fasta reference in SHORE format
-
-SHORE creates from the reference FASTA file mapping indices and caculates GC content and sequence complexity. Check more [here](http://shore.sourceforge.net/wiki/index.php/Shore_preprocess)
-
-```{bash, eval=FALSE}
-shore preprocess -C --indexes BWA,SuffixArray --fastafile <reference.fa> --indexfolder <output_directory>
-```
-
-The output file which should be used in the next step is named `reference.fa.shore`.
-
-### Call SNPs
-
-The `consensus` function identifies polymorphisms (SNPs). See documentation [here](http://shore.sourceforge.net/wiki/index.php/Shore_consensus). The two important out files generated are `quality_variant.txt` and `quality_reference.txt`.
-
-```{bash, eval=FALSE}
-shore/./shore consensus \
-    -n ${numIDactual} \
-    -f <reference.fa.shore>
-    -o <output_directory> \
-    -i <alignment.map.list> \
-    -a <scoring_matrix_hom.txt> \
-    -b 0.7 -g 4 -N
-```
-
-### Convert SHORE output to VCF
-
-The file `quality_variant.txt` and `quality_reference.txt` should be converted into VCF file and merged.
-
-```{bash, eval=FALSE}
-shore convert Variant2VCF <reference.fa> < quality_variant.txt > quality_variant.vcf
-
-shore convert Variant2VCF <reference.fa> < quality_reference.txt > quality_reference.vcf
-```
-
-Compress the files and do the concatenation
-
-```{bash, eval=FALSE}
-# Compress files
-bgzip quality_variant.vcf
-bgzip quality_reference.vcf
-
-# Concatenate the 2 files
-vcf-concat quality_variant.vcf.gz quality_reference.vcf.gz | bgzip -c > <sample_name.vcf.gz>
-
-# Index file using tabix (generates a file with a .tbi extension) 
-tabix <sample_name.vcf.gz>
-```
-
-Note: Index VCF files with tabix allows to retrieve quickly a part of the file. For instance: `tabix -h <file.vcf.gz> Chr1:100-2000`
+It took about 10 to 40 minutes per sample to download.
 
 
-### Merge several VCF file
+## SNP calling
 
-The pipeline described above is performed for each sample. Once all samples are processed, one can create a single VCF file containing all samples.
+The SNP calling is described in the GitHub repository https://github.com/johanzi/SNP_calling_Arabidopsis
 
-```{bash, eval=FALSE}
-# All vcf files end with the suffix .vcf.gz
-vcf-merge *.vcf.gz | bgzip -c > merged.vcf.gz
-```
 
 ## SNP annotation in CVI
 
@@ -1376,36 +1280,42 @@ Use SNPeff to annotate variants present within Santo Antao island. We have WGS d
 
 ## Prepare VCF file for the 83 CVI accession
 
-The VCF file `superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz` (matching the `merged.vcf.gz` described before) was generated with the Shore pipeline ([Ossowski et al., 2008](http://genome.cshlp.org/content/18/12/2024). 
-
+The VCF file `superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz` (matching the `merged.vcf.gz` described before) was generated with the Shore pipeline ([Ossowski et al., 2008](http://genome.cshlp.org/content/18/12/2024). The file is 11 Gb and therefore available only upon request.
 
 
 ```{bash, eval=FALSE}
 
+# Reorder seqID
+cut -f2 data/df_accessions_83.txt | grep -v "seq_ID" | sort > data/df_accessions_83_seqID_sorted.txt
+
+VCF="/srv/biodata/irg/grp_hancock/VCF/GATK_SNPs_Indels_For_Cape_Verde/NewVersion_withCVI-0s/CapeVerde_SNPs_Final_segregating.vcf.gz"
+
 # VCF file with only positions with SNPs
-VCF="superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz"
+# VCF="superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz"
 
 # Keep the 83 accessions from Santo Antao and keep only chromosomes
-bcftools view -S df_accessions_83.txt -r Chr1,Chr2,Chr3,Chr4,Chr5 $VCF > subset_83_only_chr.vcf
+#bcftools view -S df_accessions_83_seqID_sorted.txt -r Chr1,Chr2,Chr3,Chr4,Chr5 $VCF > subset_83_only_chr_gatk.vcf
+
+bcftools view -S df_accessions_83_seqID_sorted.txt -r 1,2,3,4,5 $VCF > subset_83_only_chr_gatk.vcf
 
 # Remove positions without alternative alleles and non-biallelic SNPs
-bcftools view --min-ac=1 --max-alleles 2  subset_83_only_chr.vcf > subset_83_only_chr_biallelic_only_alt.vcf
+bcftools view --min-ac=1 --max-alleles 2  subset_83_only_chr_gatk.vcf > subset_83_only_chr_biallelic_only_alt_gatk.vcf
 
 # Filter SNP quality with DP>=3, GQ>=25
-vcftools --vcf subset_83_only_chr_biallelic_only_alt.vcf  \
+vcftools --vcf subset_83_only_chr_biallelic_only_alt_gatk.vcf  \
 			--minDP 3 --minGQ 25 --recode --recode-INFO-all \
-			--out subset_83_only_chr_biallelic_only_alt_DP3_GQ25
+			--out subset_83_only_chr_biallelic_only_alt_DP3_GQ25_gatk
 
 # Mark singletons
-vcftools --singletons --vcf subset_83_only_chr_biallelic_only_alt_DP3_GQ25.recode.vcf
+vcftools --singletons --vcf subset_83_only_chr_biallelic_only_alt_DP3_GQ25_gatk.recode.vcf
 
 # Remove singletons
-vcftools --vcf subset_83_only_chr_biallelic_only_alt_DP3_GQ25.recode.vcf \
+vcftools --vcf subset_83_only_chr_biallelic_only_alt_DP3_GQ25_gatk.recode.vcf \
 			--exclude-positions out.singletons --recode --recode-INFO-all \
-			--out subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons
+			--out subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons_gatk
 			
 # Compress and tabix file
-bgzip subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf && tabix subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz
+bgzip subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons_gatk.recode.vcf && tabix subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons_gatk.recode.vcf.gz
 
 ```
 
@@ -1415,36 +1325,109 @@ The output file is be `subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singlet
 
 Check https://github.com/johanzi/gwas_gemma?tab=readme-ov-file#section-id-139
 
+
+
+## Generate phenotype files
+
+In bash, the rda files generated by the function `load_df_wml` is used to generate an equivalent txt files.
+Here is the pipeline in bash
+
+The script `generate_phenotype_gemma.sh` takes as arguments an rda object (generated by `load_df_wml`), the name of the methylation context, the region (gene, TE, ...) and a file containing the accession order as present in the vcf file.
+Check GitHub [documentation](https://github.com/HancockLab/WGBS_African_Arabidopsis) for more information.
+
+```{bash, eval=FALSE}
+
+# Generate phenotypes
+
+
+# Working directory
+cd /srv/netscratch/irg/grp_hancock/johan/GWAS/dna_methylation/GWAS_83_SA
+
+
+# Need to add 'sample' (BS-seq library underscore accession name) variable to df_accessions_83.txt
+#awk -v FS='\t' -v OFS='\t' '{print $0,$3"_"$1}' df_accessions_83.txt > df_accessions_83_sample.txt
+#sed -i 's/library_name/sample/' df_accessions_83_sample.txt
+#mv df_accessions_83_sample.txt df_accessions_83.txt
+
+# Path variables
+path_script="/home/zicola/SCRIPTS/bismark_pipeline/WGBS_African_Arabidopsis"
+
+path_rda="/srv/netscratch/irg/grp_hancock/johan/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
+
+
+# Generate phenotype for whole genome
+bash scripts/generate_phenotype_gemma.sh data/df_mean_filtered_83.rda CpG whole_genome data/df_accessions_83_seqID_sorted.txt data/df_accessions_83.txt
+
+bash scripts/generate_phenotype_gemma.sh data/df_mean_filtered_83.rda CHG whole_genome data/df_accessions_83_seqID_sorted.txt data/df_accessions_83.txt
+
+bash scripts/generate_phenotype_gemma.sh data/df_mean_filtered_83.rda CHH whole_genome data/df_accessions_83_seqID_sorted.txt data/df_accessions_83.txt
+
+
+# Generate phenotype for genes
+bash scripts/generate_phenotype_gemma.sh data/df_mean_genes_83.rda CpG genes data/df_accessions_83_seqID_sorted.txt 
+
+bash scripts/generate_phenotype_gemma.sh data/df_mean_genes_83.rda CHG genes data/df_accessions_83_seqID_sorted.txt 
+
+bash scripts/generate_phenotype_gemma.sh data/df_mean_genes_83.rda CHH genes data/df_accessions_83_seqID_sorted.txt
+
+# Generate phenotype for TEs
+bash scripts/generate_phenotype_gemma.sh data/df_mean_TEs_83.rda CpG TEs data/df_accessions_83_seqID_sorted.txt
+
+bash scripts/generate_phenotype_gemma.sh data/df_mean_TEs_83.rda CHG TEs data/df_accessions_83_seqID_sorted.txt
+
+bash scripts/generate_phenotype_gemma.sh data/df_mean_TEs_83.rda CHH TEs data/df_accessions_83_seqID_sorted.txt
+
+# Generate phenotype for long TEs
+bash scripts/generate_phenotype_gemma.sh data/df_mean_TEs_4kb_83.rda CpG data/TEs_4kb df_accessions_83_seqID_sorted.txt
+
+bash scripts/generate_phenotype_gemma.sh data/df_mean_TEs_4kb_83.rda CHG data/TEs_4kb df_accessions_83_seqID_sorted.txt
+
+bash scripts/generate_phenotype_gemma.sh data/df_mean_TEs_4kb_83.rda CHH data/TEs_4kb df_accessions_83_seqID_sorted.txt
+
+
+```
+
+
+
 ## Run Gemma
+
+GWAS was performed as described in this repository: https://github.com/johanzi/gwas_gemma
 
 The script should be executed for each context and each genomic region:
 
 ```{bash}
-# Clone repository with run_gwas_gemma.sh script
-git clone https://github.com/johanzi/gwas_gemma.git
+cd data
 
-VCF="subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz"
+VCF="subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons_gatk.recode.vcf.gz"
+
+
+# Whole genome
+bash ../scripts/run_gwas_gemma.sh CpG_whole_genome.tsv $VCF
+
+bash ../scripts/run_gwas_gemma.sh CHG_whole_genome.tsv $VCF
+
+bash ../scripts/run_gwas_gemma.sh CHH_whole_genome.tsv $VCF
 
 # Genes
-bash gwas_gemma/run_gwas_gemma.sh CpG_genes.tsv $VCF
+bash ../scripts/run_gwas_gemma.sh CpG_genes.tsv $VCF
 
-bash gwas_gemma/run_gwas_gemma.sh CHG_genes.tsv $VCF
+bash ../scripts/run_gwas_gemma.sh CHG_genes.tsv $VCF
 
-bash gwas_gemma/run_gwas_gemma.sh CHH_genes.tsv $VCF
+bash ../scripts/run_gwas_gemma.sh CHH_genes.tsv $VCF
 
 # TEs
-bash gwas_gemma/run_gwas_gemma.sh CpG_TEs.tsv $VCF
+bash ../scripts/run_gwas_gemma.sh CpG_TEs.tsv $VCF
 
-bash gwas_gemma/run_gwas_gemma.sh CHG_TEs.tsv $VCF
+bash ../scripts/run_gwas_gemma.sh CHG_TEs.tsv $VCF
 
-bash gwas_gemma/run_gwas_gemma.sh CHH_TEs.tsv $VCF
+bash ../scripts/run_gwas_gemma.sh CHH_TEs.tsv $VCF
 
 # long TEs
-bash gwas_gemma/run_gwas_gemma.sh CpG_TEs_4kb.tsv $VCF
+bash ../scripts/run_gwas_gemma.sh CpG_TEs_4kb.tsv $VCF
 
-bash gwas_gemma/run_gwas_gemma.sh CHG_TEs_4kb.tsv $VCF
+bash ../scripts/run_gwas_gemma.sh CHG_TEs_4kb.tsv $VCF
 
-bash gwas_gemma/run_gwas_gemma.sh CHH_TEs_4kb.tsv $VCF
+bash ../scripts/run_gwas_gemma.sh CHH_TEs_4kb.tsv $VCF
 
 ```
 
@@ -1461,7 +1444,7 @@ source("scripts/functions_gwas.R")
 #### mCG
 
 ```{r}
-dir_file <- "data/output_sXX/"
+dir_file <- "data/output/"
 
 file.name <- "CpG_whole_genome.assoc.clean.txt"
 
@@ -1480,7 +1463,7 @@ SNP_to_BED(SNP_significant, "data/mCG_whole_genome_GWAS_SNPs.bed")
 #### mCHG
 
 ```{r}
-dir_file="data/output_sXX/"
+dir_file="data/output/"
 
 file.name <- "CHG_whole_genome.assoc.clean.txt"
 
@@ -1496,7 +1479,7 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 #### mCHH
 
 ```{r}
-dir_file="data/output_sXX/"
+dir_file="data/output/"
 
 file.name <- "CHH_whole_genome.assoc.clean.txt"
 
@@ -1512,9 +1495,23 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 
 #### mCG
 
+
 ```{r}
 
-dir_file="data/output_sXX/"
+dir_file <- "Z:/output/"
+
+file.name <- "CpG_genes.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
+
+```
+
+
+```{r}
+
+dir_file="data/output/"
 
 file.name <- "CpG_genes.assoc.clean.txt"
 
@@ -1538,7 +1535,7 @@ source("scripts/functions_gwas.R")
 
 file.name <- "CpG_genes.assoc.clean.txt"
 
-dir_file="data/output_sXX/"
+dir_file="data/output/"
 
 path.file <- paste(dir_file, file.name, sep="")
 
@@ -1585,7 +1582,7 @@ Top SNP on Chr5 is near VIM3 (790 kb upstream) and falls within the gene AT5G378
 #### mCHG 
 
 ```{r}
-dir_file="data/output_sXX/"
+dir_file="data/output/"
 
 file.name <- "CHG_genes.assoc.clean.txt"
 
@@ -1601,7 +1598,7 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 #### mCHH
 
 ```{r}
-dir_file="data/output_sXX/"
+dir_file="data/output/"
 
 file.name <- "CHH_genes.assoc.clean.txt"
 
@@ -1621,7 +1618,7 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 #### mCG
 
 ```{r}
-dir_file <- "data/output_sXX/"
+dir_file <- "data/output/"
 
 file.name <- "CpG_TEs.assoc.clean.txt"
 
@@ -1635,7 +1632,7 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 #### mCHG
 
 ```{r}
-dir_file="data/output_sXX/"
+dir_file="data/output/"
 
 file.name <- "CHG_TEs.assoc.clean.txt"
 
@@ -1654,7 +1651,7 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 
 source("scripts/functions_gwas.R") 
 
-dir_file <- "data/output_sXX/"
+dir_file <- "data/output/"
 
 file.name <- "CHG_TEs_4kb.assoc.clean.txt"
 
@@ -1697,7 +1694,7 @@ manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$
 #### mCHH
 
 ```{r}
-dir_file="data/output_sXX/"
+dir_file="data/output/"
 
 file.name <- "CHH_TEs.assoc.clean.txt"
 
@@ -1714,7 +1711,7 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 #### mCG
 
 ```{r}
-dir_file <- "data/output_sXX/"
+dir_file <- "data/output/"
 
 file.name <- "CpG_TEs_4kb.assoc.clean.txt"
 
@@ -1733,7 +1730,7 @@ Manhattan plot with FBX5 SNP highlighted
 
 source("scripts/functions_gwas.R") 
 
-dir_file <- "data/output_sXX/"
+dir_file <- "data/output/"
 
 file.name <- "CpG_TEs_4kb.assoc.clean.txt"
 
@@ -1760,7 +1757,7 @@ manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$
 
 dev.off()
 
-ggsave(filename = "GWAS_test.png", width = 13, height = 4, units = "cm", dpi=300)
+#ggsave(filename = "GWAS_test.png", width = 13, height = 4, units = "cm", dpi=300)
 
 ```
 
@@ -1777,7 +1774,7 @@ ggsave(filename = "GWAS_test.png", width = 13, height = 4, units = "cm", dpi=300
 #### mCHG
 
 ```{r}
-dir_file="data/output_sXX/"
+dir_file="data/output/"
 
 file.name <- "CHG_TEs_4kb.assoc.clean.txt"
 
@@ -1793,7 +1790,7 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 ```{r}
 source("scripts/functions_gwas.R")
 
-dir_file="data/output_sXX/"
+dir_file="data/output/"
 
 file.name <- "CHG_TEs_4kb.assoc.clean.txt"
 
@@ -1837,7 +1834,7 @@ The peak at Chr5 seems to be close to SUVH4. Most significant SNP is 5:5843297
 ```{r}
 source("scripts/functions_gwas.R") 
 
-dir_file="data/output_sXX/"
+dir_file="data/output/"
 
 file.name <- "CHG_TEs_4kb.assoc.clean.txt"
 
@@ -1892,8 +1889,22 @@ SNP_to_BED(SNP_mCHG_long_TEs, "data/mCHG_long_TEs_GWAS_SNPs.bed")
 
 #### mCHH
 
+
+
 ```{r}
-dir_file="data/output_sXX/"
+
+dir_file <- "Z:/output/"
+
+file.name <- "CHH_TEs_4kb.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
+
+```
+
+```{r}
+dir_file="data/output/"
 
 file.name <- "CHH_TEs_4kb.assoc.clean.txt"
 
@@ -2696,7 +2707,7 @@ bash ${path_run_gwas}/run_gwas_gemma.sh CpG_genes.tsv $VCF covariate_VIM2.txt
 
 source("scripts/functions_gwas.R")
 
-dir_file <- "data/output_sXX/"
+dir_file <- "data/output/"
 
 file.name <- "CpG_genes_covariate_VIM2.assoc.clean.txt"
 
@@ -2758,7 +2769,7 @@ bash ${path_run_gwas}/run_gwas_gemma.sh CHH_TEs_4kb.tsv $VCF covariate_CMT2.txt
 ```{r}
 source("scripts/functions_gwas.R")
 
-dir_file <- "data/output_sXX/"
+dir_file <- "data/output/"
 
 file.name <- "CHH_TEs_4kb_covariate_CMT2.assoc.clean.txt"
 
@@ -2809,7 +2820,7 @@ bash ${path_run_gwas}/run_gwas_gemma.sh CHH_TEs_4kb.tsv $VCF covariate_FBX5.txt
 ```{r}
 source("scripts/functions_gwas.R")
 
-dir_file <- "data/output_sXX/"
+dir_file <- "data/output/"
 
 file.name <- "CpG_TEs_4kb_covariate_FBX5.assoc.clean.txt"
 
