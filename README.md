@@ -2,12 +2,12 @@ High impact mutations drive DNA methylation variation after colonization
 of a novel habitat
 ================
 Johan Zicola
-2025-05-22 16:20:28
+2025-05-26 12:26:31
 
 - [Overview](#overview)
+- [Softwares required](#softwares-required)
 - [WGBS library preparation](#wgbs-library-preparation)
 - [Sequencing](#sequencing)
-- [Softwares required](#softwares-required)
 - [Reanalysis of the 1001 GP data](#reanalysis-of-the-1001-gp-data)
   - [Get information samples](#get-information-samples)
   - [Download data](#download-data)
@@ -18,7 +18,6 @@ Johan Zicola
 - [Analysis of the accessions from Cape Verde and
   Morocco](#analysis-of-the-accessions-from-cape-verde-and-morocco)
   - [Download fastq files](#download-fastq-files)
-  - [Rename fastq files](#rename-fastq-files)
   - [Run Bismark](#run-bismark)
   - [Methylation call with methylKit](#methylation-call-with-methylkit)
   - [Annotation Araport11](#annotation-araport11)
@@ -55,11 +54,10 @@ Johan Zicola
   - [Prepare VCF file for the 83 CVI
     accession](#prepare-vcf-file-for-the-83-cvi-accession)
   - [Prepare phenotype](#prepare-phenotype)
-  - [Generate phenotype files](#generate-phenotype-files)
+    - [Generate phenotype files](#generate-phenotype-files)
   - [Run Gemma](#run-gemma)
     - [GWAS whole genome](#gwas-whole-genome)
     - [GWAS genes](#gwas-genes)
-    - [GWAS all TEs](#gwas-all-tes)
     - [GWAS long TEs](#gwas-long-tes)
   - [Variants at SUVH4, AGO9, DRM1, and
     MET1](#variants-at-suvh4-ago9-drm1-and-met1)
@@ -227,6 +225,22 @@ subset of the WGBS data from the 1001 Genome Project (1001GP)
 2016](http://www.sciencedirect.com/science/article/pii/S0092867416308522))
 and the RNA-seq performed on Cape Verde accessions.
 
+# Softwares required
+
+- Bismark (v0.19.0)
+- Python3.5
+- GEMMA (v0.94)
+- vcftools (v0.1.14)
+- bcftools (v1.2)
+- bwa (v0.7.15)
+- R (\>3.3.0)
+- SRA tool kit (v3.2.1)
+- FastQC (v0.11.9)
+- multiqc (v1.6)
+- cutadapt (v2.9
+- methylKit (v1.14.2)
+- HISAT2 (v11.4.0)
+
 # WGBS library preparation
 
 Libraries were prepared as described previously in [Urich et
@@ -245,23 +259,6 @@ Cutadapt ([Martin et al.,
 Visual inspection on graphics produced by
 [fastQC](https://www.bioinformatics.babraham.ac.uk/projects/fastqc/) was
 used to visually determine the quality of the reads.
-
-# Softwares required
-
-- Bismark (v0.19.0)
-- Python3.5
-- GEMMA (v0.94)
-- vcftools (v0.1.14)
-- bcftools (v1.2)
-- bwa (v0.7.15)
-- R (\>3.3.0) with the libraries indicated in the scripts
-- [SRA tool
-  kit](https://trace.ncbi.nlm.nih.gov/Traces/sra/sra.cgi?view=toolkit_doc)
-  from NCBI
-- FastQC v0.11.9
-- multiqc v1.6
-- cutadapt v2.9
-- methylKit (v1.14.2) R package and dependencies
 
 # Reanalysis of the 1001 GP data
 
@@ -413,7 +410,7 @@ files) with the flag `-l`
 
 ``` bash
 while read i; do
-bash run_all_bismark.sh -l -r </path/to/dir_fasta/> -1 ${i} -o </path/to/output/> 
+bash run_bismark.sh -l -r </path/to/dir_fasta/> -1 ${i} -o </path/to/output/> 
 done < <(ls *fastq.gz)
 ```
 
@@ -448,21 +445,19 @@ average: 99.52% Stdev: 0.38%
 ### Mapping paired-end data
 
 ``` bash
-
 # Get single name for each pair data
 ls *fastq.gz | cut -d'_' -f1,2 | uniq > list_fastq_files.txt
 
 while read i; do
           fastq1=${i}_1.fastq.gz
           fastq2=${i}_2.fastq.gz
-            bash run_all_bismark.sh -l -r </path/to/dir_fasta/> -1 $fastq1 -2 $fastq2 -o </path/to/output/> 
+            bash run_bismark.sh -l -r </path/to/dir_fasta/> -1 $fastq1 -2 $fastq2 -o </path/to/output/> 
 done < list_fastq_files.txt
 ```
 
 #### Assess mapping efficiency
 
 ``` bash
-
 cd /srv/netscratch/dep_coupland/grp_hancock/johan/bs-seq_data_1001/fastq_files/1001/PE_data
 
 for i in *bismark_bt2_PE_report.txt.gz; do
@@ -491,8 +486,6 @@ for i in *_report.conversion_efficiency.txt; do
 done >> conversion_efficiency.txt
 ```
 
-1.  
-
 # Analysis of the accessions from Cape Verde and Morocco
 
 We generated WGBS data for 83 accessions from Cape Verde - Santo Antao,
@@ -518,15 +511,6 @@ In bash, download SRA files and convert them in fastq files:
 while read name in list; do
     fastq-dump --split-spot $name
 done < SRR_Acc_List.txt
-```
-
-## Rename fastq files
-
-Change the SRR name to the name of the library
-
-``` bash
-TODO when the data of CPV paper will be in NCBI
-Also group needs to agree on name system for fastq files
 ```
 
 ## Run Bismark
@@ -611,16 +595,9 @@ cat Araport11_GFF3_transposons.bed | awk -F'\t' '$3-$2 >= 4000 {print $0}' > Ara
 
 wc -l Araport11_GFF3_transposons_longer_4kb.bed
 1235 Araport11_GFF3_transposons_longer_4kb.bed
-
-
-# Keep TEs smaller than 500 bp
-cat Araport11_GFF3_transposons.bed | awk -F'\t' '$3-$2 < 500 {print $0}' > Araport11_GFF3_transposons_smaller_500bp.bed
-
-wc -l Araport11_GFF3_transposons_smaller_500bp.bed
-19530 Araport11_GFF3_transposons_smaller_500bp.bed
 ```
 
-We have a total of 31,189 TEs, including 1235 TEs bigger than 4 kb.
+We have a total of 31,189 TEs, including 1,235 TEs bigger than 4 kb.
 
 ## R libraries and functions
 
@@ -660,17 +637,8 @@ path_bed <- "data/bed_files/"
 # Path to bed files for region analysis
 bed_genes <- paste(path_bed, "Araport11_GFF3_genes_only.bed", sep = "")
 
-# Get coordinates of the genes body methylated and body methylated + intermediate methylated from Takuno et al., 2017 (https://academic.oup.com/mbe/article/34/6/1479/3059954)
-# List sent by Takuno on 2019-06-24
-bed_genes_BM <- "BM_gene_ID.bed"
-bed_genes_BM_IM <- "BM_IM_gene_ID.bed"
-
-# Analysis on cluster 5 and 6
-# # Path to bed files for region analysis (see section 'Analysis of cluster 5 and 6' for details of these bed files)
-bed_genes_cluster5 <- paste(path_bed, "cluster5_coordinates.bed", sep = "")
-bed_genes_cluster6 <- paste(path_bed, "cluster6_coordinates.bed", sep = "")
-
-# bed_genes_annotate <- paste(workdir, "Arabidopsis_thaliana.TAIR10.39.bed", sep="") # Version that was made from GTF (works with readTranscriptFeatures)
+# bed_genes_annotate <- paste(workdir, "Arabidopsis_thaliana.TAIR10.39.bed", sep="")
+# Version that was made from GTF (works with readTranscriptFeatures)
 
 # All TEs
 bed_TEs <- paste(path_bed, "Araport11_GFF3_transposons.bed", sep = "")
@@ -686,7 +654,8 @@ bed_TEs_500bp <- paste(path_bed, "Araport11_GFF3_transposons_smaller_500bp.bed",
 ################# ACCESSIONS FILES ########################
 ####################################################
 
-# Path to file with accession information (several were used in the different analyses and they are all available in GitHub)
+# Path to file with accession information (several were 
+# used in the different analyses and they are all available in GitHub)
 path_df_accessions <- "data/df_accessions_83.txt"
 
 # Get information of the accessions and generate a table
@@ -696,14 +665,17 @@ df_accessions <- read.table(path_df_accessions, header = TRUE, stringsAsFactors 
 # Order the accession as list.files() list the bismark cytosine report files
 df_accessions <- order_df_accessions(df_accessions)
 
-# I need to create an hybrid name otherwise the loading of the file won't respect the original order of the input bismark file
+# I need to create an hybrid name otherwise the loading of the 
+# file won't respect the original order of the input bismark file
 df_accessions$sample <- paste(df_accessions$library, df_accessions$name, sep = "_")
 
 # Make a list of samples
 list_samples <- as.list(as.vector(df_accessions$sample))
 
-# Get list of treatments and reformat so that the first treatment is 0 (control should be 0 optimally)
-# Here I put as example CMT2 allele but the variable used as treatment differ in different analysis
+# Get list of treatments and reformat so that the first 
+# treatment is 0 (control should be 0 optimally)
+# Here I put as example CMT2 allele but the variable used 
+# as treatment differ in different analysis
 list_treatments <- as.numeric(df_accessions$CMT2)
 
 # Vector of the 3 contexts analyzed
@@ -832,7 +804,8 @@ ggplot_all(df_mean_genes, title = title)
 ``` r
 require(gghighlight)
 
-df_accessions <- read.table("data/df_accessions_1001_CPV_MOR.txt", header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
+df_accessions <- read.table("data/df_accessions_1001_CPV_MOR.txt",
+                            header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
 
 path_DB <- "F:/NETSCRATCH/methylKit_DB_files/1001_project"
 
@@ -847,9 +820,13 @@ load_df_wml(path_DB, df_name)
 df <- merge(df_mean_genes, df_accessions, by="sample")
 
 # Use dplyr prefix as desc function is also in IRange, which creates a conflict
-df_subset <- df %>% group_by(country_code) %>% filter(context=="CpG", country_code!="USA", name!="SRR771702") %>% filter(n() > 7) %>%  arrange(-dplyr:::desc(Latitude))
+df_subset <- df %>% group_by(country_code) %>% 
+  filter(context=="CpG", country_code!="USA", name!="SRR771702") %>% 
+  filter(n() > 7) %>%  arrange(-dplyr:::desc(Latitude))
 
-df_subset <- df %>% group_by(country_code) %>% filter(context=="CpG", !(country_code %in% c("USA","CPV-FO")), name!="SRR771702") %>% filter(n() > 7) %>%  arrange(-dplyr:::desc(Latitude))
+df_subset <- df %>% group_by(country_code) %>% 
+  filter(context=="CpG", !(country_code %in% c("USA","CPV-FO")), name!="SRR771702") %>% filter(n() > 7) %>% 
+  arrange(-dplyr:::desc(Latitude))
 
 # Change CPV-SA to CPV
 levels(df_subset$country_code)[levels(df_subset$country_code)=="CPV-SA"] <- "CPV"
@@ -930,7 +907,8 @@ load_df_wml(path_DB, df_name)
 ``` r
 require(gghighlight)
 
-df_accessions <- read.table("data/df_accessions_1001_CPV_MOR.txt", header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
+df_accessions <- read.table("data/df_accessions_1001_CPV_MOR.txt", 
+                            header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
 
 path_DB <- "F:/NETSCRATCH/methylKit_DB_files/1001_project"
 ```
@@ -1034,7 +1012,6 @@ load_df_wml(path_DB, df_name)
 # Plot (use get() to pass the string name of the dataframe as a R object)
 # ggplot_all(df_mean_genes, title = title)
 
-
 library(gghighlight)
 
 df <- merge(df_mean_TEs, df_accessions, by = "sample")
@@ -1055,11 +1032,9 @@ df_subset <- df %>%
 # Change CPV-SA to CPV
 levels(df_subset$country_code)[levels(df_subset$country_code) == "CPV-SA"] <- "CPV"
 
-
 order_country_code <- unique(as.vector(df_subset$country_code))
 
 df_subset$country_code <- factor(df_subset$country_code, levels = order_country_code, ordered = TRUE)
-
 
 median_meth <- median(df_subset$percent_methylation)
 
@@ -1114,18 +1089,14 @@ ggplot(data = df_subset, aes(x = country_code, y = percent_methylation)) +
 ### mCHH all TEs
 
 ``` r
+require(gghighlight)
+
 df_name <- "df_mean_TEs"
 title <- "Weighted Methylation Level for genes"
 
 get_df_wml(list_methylRawLists_TEs, path_DB, df_name)
 
 load_df_wml(path_DB, df_name)
-
-# Plot (use get() to pass the string name of the dataframe as a R object)
-# ggplot_all(df_mean_genes, title = title)
-
-
-library(gghighlight)
 
 df <- merge(df_mean_TEs, df_accessions, by = "sample")
 
@@ -1145,10 +1116,10 @@ df_subset <- df %>%
 # Change CPV-SA to CPV
 levels(df_subset$country_code)[levels(df_subset$country_code) == "CPV-SA"] <- "CPV"
 
-
 order_country_code <- unique(as.vector(df_subset$country_code))
 
-df_subset$country_code <- factor(df_subset$country_code, levels = order_country_code, ordered = TRUE)
+df_subset$country_code <- factor(df_subset$country_code, 
+                                 levels = order_country_code, ordered = TRUE)
 
 
 median_meth <- median(df_subset$percent_methylation)
@@ -1213,7 +1184,6 @@ load_df_wml(path_DB, df_name)
 # Plot (use get() to pass the string name of the dataframe as a R object)
 # ggplot_all(df_mean_genes, title = title)
 
-
 df <- merge(df_mean_TEs_4kb, df_accessions, by = "sample")
 
 # Use dplyr prefix as desc function is also in IRange, which creates a conflict
@@ -1235,7 +1205,6 @@ levels(df_subset$country_code)[levels(df_subset$country_code) == "CPV-SA"] <- "C
 order_country_code <- unique(as.vector(df_subset$country_code))
 
 df_subset$country_code <- factor(df_subset$country_code, levels = order_country_code, ordered = TRUE)
-
 
 median_meth <- median(df_subset$percent_methylation)
 
@@ -1310,11 +1279,9 @@ df_subset <- df %>% group_by(country_code) %>% filter(context=="CHG", !(country_
 # Change CPV-SA to CPV
 levels(df_subset$country_code)[levels(df_subset$country_code)=="CPV-SA"] <- "CPV"
 
-
 order_country_code <- unique(as.vector(df_subset$country_code))
 
 df_subset$country_code <- factor(df_subset$country_code, levels=order_country_code, ordered=TRUE)
-
 
 median_meth <- median(df_subset$percent_methylation)
 
@@ -1382,11 +1349,9 @@ df_subset <- df %>% group_by(country_code) %>% filter(context=="CHH", !(country_
 # Change CPV-SA to CPV
 levels(df_subset$country_code)[levels(df_subset$country_code)=="CPV-SA"] <- "CPV"
 
-
 order_country_code <- unique(as.vector(df_subset$country_code))
 
 df_subset$country_code <- factor(df_subset$country_code, levels=order_country_code, ordered=TRUE)
-
 
 median_meth <- median(df_subset$percent_methylation)
 
@@ -1431,8 +1396,6 @@ ggplot(data=df_subset, aes(x=country_code, y=percent_methylation)) + geom_boxplo
 ```
 
 ![](images/mCHH_long_TEs_worldwide.png)
-
-1.  
 
 # GWAS analysis
 
@@ -1504,23 +1467,17 @@ have WGS data for 190 accessions.
 The VCF file `superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz` (matching
 the `merged.vcf.gz` described before) was generated with the Shore
 pipeline ([Ossowski et al.,
-2008](http://genome.cshlp.org/content/18/12/2024). The file is 11 Gb and
-therefore available only upon request.
+2008](http://genome.cshlp.org/content/18/12/2024)). The file is 11 Gb
+and therefore available only upon request.
 
 ``` bash
-
 # Reorder seqID
 cut -f2 data/df_accessions_83.txt | grep -v "seq_ID" | sort > data/df_accessions_83_seqID_sorted.txt
 
-VCF="/srv/biodata/irg/grp_hancock/VCF/GATK_SNPs_Indels_For_Cape_Verde/NewVersion_withCVI-0s/CapeVerde_SNPs_Final_segregating.vcf.gz"
-
-# VCF file with only positions with SNPs
-# VCF="superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz"
+VCF="/srv/biodata/irg/grp_hancock/VCF/superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz"
 
 # Keep the 83 accessions from Santo Antao and keep only chromosomes
-#bcftools view -S df_accessions_83_seqID_sorted.txt -r Chr1,Chr2,Chr3,Chr4,Chr5 $VCF > subset_83_only_chr_gatk.vcf
-
-bcftools view -S df_accessions_83_seqID_sorted.txt -r 1,2,3,4,5 $VCF > subset_83_only_chr_gatk.vcf
+bcftools view -S df_accessions_83_seqID_sorted.txt -r Chr1,Chr2,Chr3,Chr4,Chr5 $VCF > subset_83_only_chr_gatk.vcf
 
 # Remove positions without alternative alleles and non-biallelic SNPs
 bcftools view --min-ac=1 --max-alleles 2  subset_83_only_chr_gatk.vcf > subset_83_only_chr_biallelic_only_alt_gatk.vcf
@@ -1528,30 +1485,30 @@ bcftools view --min-ac=1 --max-alleles 2  subset_83_only_chr_gatk.vcf > subset_8
 # Filter SNP quality with DP>=3, GQ>=25
 vcftools --vcf subset_83_only_chr_biallelic_only_alt_gatk.vcf  \
             --minDP 3 --minGQ 25 --recode --recode-INFO-all \
-            --out subset_83_only_chr_biallelic_only_alt_DP3_GQ25_gatk
+            --out subset_83_only_chr_biallelic_only_alt_DP3_GQ25
 
 # Mark singletons
-vcftools --singletons --vcf subset_83_only_chr_biallelic_only_alt_DP3_GQ25_gatk.recode.vcf
+vcftools --singletons --vcf subset_83_only_chr_biallelic_only_alt_DP3_GQ25.recode.vcf
 
 # Remove singletons
-vcftools --vcf subset_83_only_chr_biallelic_only_alt_DP3_GQ25_gatk.recode.vcf \
+vcftools --vcf subset_83_only_chr_biallelic_only_alt_DP3_GQ25.recode.vcf \
             --exclude-positions out.singletons --recode --recode-INFO-all \
-            --out subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons_gatk
+            --out subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons
             
 # Compress and tabix file
-bgzip subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons_gatk.recode.vcf && tabix subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons_gatk.recode.vcf.gz
+bgzip subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf \
+  && tabix subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz
 ```
 
 The output file is be
 `subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz`.
-This file contains 954,216 SNPs.
 
 ## Prepare phenotype
 
 Check
 <https://github.com/johanzi/gwas_gemma?tab=readme-ov-file#section-id-139>
 
-## Generate phenotype files
+### Generate phenotype files
 
 In bash, the rda files generated by the function `load_df_wml` is used
 to generate an equivalent txt files. Here is the pipeline in bash
@@ -1567,10 +1524,8 @@ for more information.
 
 # Generate phenotypes
 
-
 # Working directory
 cd /srv/netscratch/irg/grp_hancock/johan/GWAS/dna_methylation/GWAS_83_SA
-
 
 # Need to add 'sample' (BS-seq library underscore accession name) variable to df_accessions_83.txt
 #awk -v FS='\t' -v OFS='\t' '{print $0,$3"_"$1}' df_accessions_83.txt > df_accessions_83_sample.txt
@@ -1581,7 +1536,6 @@ cd /srv/netscratch/irg/grp_hancock/johan/GWAS/dna_methylation/GWAS_83_SA
 path_script="/home/zicola/SCRIPTS/bismark_pipeline/WGBS_African_Arabidopsis"
 
 path_rda="/srv/netscratch/irg/grp_hancock/johan/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
-
 
 # Generate phenotype for whole genome
 bash scripts/generate_phenotype_gemma.sh data/df_mean_filtered_83.rda CpG whole_genome data/df_accessions_83_seqID_sorted.txt data/df_accessions_83.txt
@@ -1623,8 +1577,7 @@ The script should be executed for each context and each genomic region:
 ``` bash
 cd data
 
-VCF="subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons_gatk.recode.vcf.gz"
-
+VCF="subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz"
 
 # Whole genome
 bash ../scripts/run_gwas_gemma.sh CpG_whole_genome.tsv $VCF
@@ -1811,9 +1764,7 @@ path.file <- paste(dir_file, file.name, sep="")
 SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 ```
 
-![](images/GWAS_mCHH_genes.png)
-
-### GWAS all TEs
+![](images/GWAS_mCHH_genes.png) \### GWAS all TEs
 
 #### mCG
 
@@ -1941,19 +1892,19 @@ ann<-rep(1, length(gwas.results$P))
 ann[with(gwas.results, CHR==2 & BP==FBX5)]<-2
 ann<-factor(ann, levels=1:2, labels=c("","FBX5"))
 
-png("GWAS_test.png", width = 3000, height = 500, units = "px", res=300)
+#png("GWAS_test.png", width = 3000, height = 500, units = "px", res=300)
 
 manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$P, annotate=ann, sig.level=bonferroni_threshold, title="GWAS for mCG at long TEs")
 
-dev.off()
-
-#ggsave(filename = "GWAS_test.png", width = 13, height = 4, units = "cm", dpi=300)
+#dev.off()
 ```
 
 ![](images/GWAS_mCG_long_TEs_FBX5_SNP.png)
 
 ``` r
-manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$P, annotate=ann, sig.level=bonferroni_threshold, title="GWAS for mCG at long TEs")
+manhattan.plot(chr = gwas.results$CHR, 
+               pos=gwas.results$BP, pvalue=gwas.results$P, 
+               annotate=ann, sig.level=bonferroni_threshold, title="GWAS for mCG at long TEs")
 
 ggsave(filename = "GWAS_test.png", width = 13, height = 4, units = "cm", dpi=300)
 ```
@@ -1998,6 +1949,8 @@ ann<-factor(ann, levels=1:2, labels=c("","FBX5"))
 
 manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$P, annotate=ann, sig.level=bonferroni_threshold, title="GWAS mCHG at long TEs")
 ```
+
+![](images/GWAS_mCHG_long_TEs_FBX5.png)
 
 Recover SNPs above -log10(p) = 3
 
@@ -2067,16 +2020,6 @@ SNP_to_BED(SNP_mCHG_long_TEs, "data/mCHG_long_TEs_GWAS_SNPs.bed")
 #### mCHH
 
 ``` r
-dir_file <- "Z:/output/"
-
-file.name <- "CHH_TEs_4kb.assoc.clean.txt"
-
-path.file <- paste(dir_file, file.name, sep="")
-
-SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
-```
-
-``` r
 dir_file="data/output/"
 
 file.name <- "CHH_TEs_4kb.assoc.clean.txt"
@@ -2095,6 +2038,12 @@ and their effect of the 4 candidate genes in Chr5 (AGO9, SUVH4, DRM1,
 and MET1).
 
 ### Subsample VCF file for the 190 Santo Antao accessions
+
+Note: We include Cvi-0 as Santo Antao accession as it is genetically
+closer to Santo Antao accessions than Fogo accessions. Cvi-0 was
+collected in 1983 by Lobin in Cape Verde but the island was not
+specified. See
+<https://www.arabidopsis.org/ais/1983/lobin-1983-aabme.html>
 
 ``` bash
 
@@ -2124,8 +2073,6 @@ wc -l out.singletons
 vcftools --vcf subset_190_SA_alt_DP3_GQ25.recode.vcf \
   --exclude-positions out.singletons --recode \
   --recode-INFO-all --out subset_190_SA_alt_DP3_GQ25_wo_singletons
-  
-
 
 #After filtering, kept 479094 out of a possible 484836 Sites
 #Run Time = 110.00 seconds
@@ -2155,13 +2102,12 @@ bcftools view subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.vcf -Oz -o
 bcftools index subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.vcf.gz
 ```
 
-442724 SNPs remain. Outpuf VCF file is
+Outpuf VCF file is
 `subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.vcf`
 
 ### Run SnpEff
 
 ``` bash
-
 # Download snpeff (2025-05-15)
 wget https://snpeff.blob.core.windows.net/versions/snpEff_latest_core.zip
 
@@ -2237,8 +2183,6 @@ rm summary_SnpEff_chr5_candidates.txt summary_SnpEff_chr5_candidates_freq.txt
 
 Import text file `summary_SnpEff_chr5_candidates_final.txt` in Excel
 (Data \> From Text \> Tab-separated) =\> Supplementary Table 11
-
-1.  
 
 # Allele status in CPV
 
@@ -2346,8 +2290,6 @@ cut -f2 nb_reads_vim2_deletion.txt | sort -n -
 # Classify each sample based on nb of reads with threshold = 50
 awk -v OFS="\t" '$2 <= 50 {print $1,$2,"deletion"} $2 > 50 {print $1,$2,"no_deletion"}' nb_reads_vim2_deletion.txt > nb_reads_vim2_deletion_status.txt
 
-
-
 #################################################################
 # "VIM3" SNP
 
@@ -2372,10 +2314,6 @@ awk -v OFS='\t' '{print $0,"VIM3_alt"}' VIM3_alt.txt > VIM3_alt_final.txt
 awk -v OFS='\t' '{print $0,"VIM3_ref"}' VIM3_ref.txt > VIM3_ref_final.txt
 
 cat VIM3_alt_final.txt VIM3_ref_final.txt > VIM3_allele_status.txt
-
-# How many accessions with status
-wc -l VIM3_allele_status.txt
-1812 VIM3_allele_status.txt
 ```
 
 ## Allele distribution by population
@@ -2386,13 +2324,17 @@ easily find back an accession name based on its sequencing ID (seqID).
 ``` bash
 
 # Make a Python dictionary of the CPV accessions names and their seqID
-python ./scripts/find_accession/find_accession.py make_dict ./scripts/find_accession/name_seqID_CPV_190_accessions.txt > ./scripts/find_accession/name_seqID_CPV_190_accessions.dict
+python ./scripts/find_accession/find_accession.py make_dict \
+  ./scripts/find_accession/name_seqID_CPV_190_accessions.txt > \ 
+  ./scripts/find_accession/name_seqID_CPV_190_accessions.dict
 
 # Make a second Python dictionary of the seqID and accession names
 
 awk '{print $2,$1}' OFS='\t' name_seqID_CPV_190_accessions.txt > seqID_name_CPV_190_accessions.txt
 
-python ./scripts/find_accession/find_accession.py make_dict ./scripts/find_accession/seqID_name_CPV_190_accessions.txt > ./scripts/find_accession/seqID_name_CPV_190_accessions.dict
+python ./scripts/find_accession/find_accession.py make_dict \
+  ./scripts/find_accession/seqID_name_CPV_190_accessions.txt > \
+  ./scripts/find_accession/seqID_name_CPV_190_accessions.dict
 ```
 
 ``` bash
@@ -2402,7 +2344,6 @@ python ./scripts/find_accession/find_accession.py make_dict ./scripts/find_acces
 
 # 4073_M (Cvi-0 is included) => 190 accessions
 clean_file="/srv/biodata/irg/grp_hancock/VCF/santos_clean_2019-07-11.txt"
-
 
 #########################################################
 # For FBX5
@@ -2444,7 +2385,6 @@ while read i; do
 done < /srv/biodata/dep_coupland/grp_hancock/VCF/santos_clean_2019-07-11.txt
 
 # 190 accessions retrieved => OK
-
 
 while read i; do
     seqID=$(echo "$i" | cut -f1)
@@ -2689,8 +2629,6 @@ ggplot(data = df, aes(population_nb, freq_derived)) +
 
 ![](images/FBX5_deletion_frequency.png)
 
-1.  
-
 # Plot methylation by VIM2/4 allele
 
 ``` r
@@ -2782,8 +2720,6 @@ with(df_mean[(df_mean$context=="CpG"),], t.test(percent_methylation[VIM2==0], pe
     sample estimates:
     mean of x mean of y 
     10.528693  7.580085 
-
-1.  
 
 # GWAS gbM with VIM2/4 insertion as covariate
 
@@ -2887,8 +2823,6 @@ manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$
 
 ![](images/GWAS_mCG_genes_VIM2del_covariate.png)
 
-1.  
-
 # GWAS mCHH long TEs with CMT2 as covariate
 
 ``` bash
@@ -2922,14 +2856,13 @@ bonferroni_threshold <- 0.05/nb_snps
 
 threshold_pvalue <- bonferroni_threshold
 
-
 ann<-rep(1, length(gwas.results$P))
 #ann<-factor(ann, levels=1:2, labels=c("","VIM2"))
 
 manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$P, annotate=ann, sig.level=bonferroni_threshold, title="GWAS for mCHH at long TEs (>4kb) with CMT2stop SNP as covariate")
 ```
 
-![](images/GWAS_mCHH_long_TEs_CMT2_covariate.png) \#.
+![](images/GWAS_mCHH_long_TEs_CMT2_covariate.png)
 
 # GWAS mCG long TEs with FBX5 as covariate
 
@@ -2976,8 +2909,6 @@ manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$
 
 ![](images/GWAS_mCG_long_TEs_FBX5_covariate.png)
 
-1.  
-
 # DMR analysis for VIM2
 
 To call for differential methylated regions, we pooled the WGBS data of
@@ -2988,7 +2919,6 @@ that have enough coverage in each sample to perform proper statistics.
 ## Pooling of the data
 
 ``` bash
-
 # Get WGBS library ID of the samples that segregate for VIM2/4 deletion
 awk '$7==0 {print $3}' df_accessions_83.txt > libraries_VIM2wt.txt
 awk '$7==1 {print $3}' df_accessions_83.txt > libraries_VIM2del.txt
@@ -3310,8 +3240,6 @@ BP %>% mutate(Name = fct_reorder(Name, Fold.Enrichment)) %>%  ggplot(aes(x=Fold.
 
 ![](images/GO_BP_DMRs.png)
 
-1.  
-
 # Analysis DNA methylation in vim mutants
 
 We reused the WGBS data generated for WT Col-0 and the *vim* mutants
@@ -3619,7 +3547,6 @@ df_mean_CpG$location <- factor(df_mean_CpG$location, levels = c("Col-0", "Col-0_
 
 df_mean_CpG$VIM2 <- as.factor(df_mean_CpG$VIM2)
 
-
 # Highlight Cvi-0 within SA (84th samples in dataframe)
 ggplot(data = df_mean_CpG, aes(location, percent_methylation, fill = VIM2)) +
   geom_boxplot(outlier.shape = NA) +
@@ -3642,8 +3569,6 @@ ggplot(data = df_mean_CpG, aes(location, percent_methylation, fill = VIM2)) +
 ```
 
 ![](images/all_TEs_methylation_vim_mutants_with_SA.png)
-
-1.  
 
 # Analysis DNA methylation in SAIL and SALK fbx5 and cmt2 mutants
 
@@ -3797,10 +3722,8 @@ get_df_wml(list_methylRawLists_TEs_4kb, path_DB, df_name)
 
 load_df_wml(path_DB, df_name)
 
-
 # Merge dataframes of methylation levels and df_accessions to get detailed information about dataset
 df_mean <- merge(get(df_name), df_accessions, by = "sample")
-
 
 df_mean_subset <- df_mean %>%
   filter(context == "CHG") %>%
@@ -4238,8 +4161,6 @@ percent_methylation\[pool == “cmt2-5”\] t = 19.682, df = 4, p-value =
 to 0 95 percent confidence interval: 8.07735 10.73048 sample estimates:
 mean of x mean of y 11.26492 1.86100
 
-1.  
-
 # Analysis DNA methylation fbx5 CRISPR lines
 
 ## Samples
@@ -4525,8 +4446,6 @@ Linear Hypotheses: Estimate Std. Error t value Pr(\>\|t\|) fbx5_8_9 -
 S7_B5 == 0 -1.963 1.056 -1.860 0.223 fbx5_12_3 - S7_B5 == 0 0.100 1.056
 0.095 0.999 fbx5_3_23 - S7_B5 == 0 -0.250 1.056 -0.237 0.990 (Adjusted p
 values reported – single-step method)
-
-1.  
 
 # RNA-seq library preparation
 
@@ -5374,8 +5293,6 @@ plotCounts(dds,
   main = "VIM3 based on VIM3 allele", returnData = F
 )
 ```
-
-1.  
 
 # Analysis TE expression
 
