@@ -1,0 +1,11 @@
+Name	FDR	Fold Enrichment	gene
+cytoplasm	5.93E-53	1.33	1823
+nucleus	3.66E-33	1.15	3319
+Golgi apparatus	6.53E-23	1.52	463
+cytosol	9.48E-18	1.28	909
+endosome	5.60E-17	1.86	165
+trans-Golgi network	6.60E-17	1.93	147
+Cul4-RING E3 ubiquitin ligase complex	1.71E-15	2.39	79
+chloroplast	1.11E-14	1.18	1573
+plastid	3.92E-14	1.44	371
+chloroplast stroma	3.18E-12	1.48	282

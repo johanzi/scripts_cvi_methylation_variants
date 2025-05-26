@@ -2,7 +2,7 @@ High impact mutations drive DNA methylation variation after colonization
 of a novel habitat
 ================
 Johan Zicola
-2025-05-26 12:26:31
+2025-05-26 14:05:18
 
 - [Overview](#overview)
 - [Softwares required](#softwares-required)
@@ -48,7 +48,8 @@ Johan Zicola
     - [mCHG long TEs](#mchg-long-tes)
     - [mCHH long TEs](#mchh-long-tes)
 - [GWAS analysis](#gwas-analysis)
-  - [Download raw fastq reads](#download-raw-fastq-reads)
+  - [Download raw fastq reads whole-genome
+    sequencing](#download-raw-fastq-reads-whole-genome-sequencing)
   - [SNP calling](#snp-calling)
   - [SNP annotation in CVI](#snp-annotation-in-cvi)
   - [Prepare VCF file for the 83 CVI
@@ -58,6 +59,7 @@ Johan Zicola
   - [Run Gemma](#run-gemma)
     - [GWAS whole genome](#gwas-whole-genome)
     - [GWAS genes](#gwas-genes)
+    - [GWAS all TEs](#gwas-all-tes)
     - [GWAS long TEs](#gwas-long-tes)
   - [Variants at SUVH4, AGO9, DRM1, and
     MET1](#variants-at-suvh4-ago9-drm1-and-met1)
@@ -144,6 +146,9 @@ Johan Zicola
     mutants](#mcg-in-long-tes-for-fbx5-mutants)
   - [mCHG in long TEs for FBX5
     mutants](#mchg-in-long-tes-for-fbx5-mutants)
+  - [mCHH in long TEs for FBX5
+    mutants](#mchh-in-long-tes-for-fbx5-mutants)
+  - [Statistical tests](#statistical-tests)
     - [Col-0 background](#col-0-background)
     - [Col-3 background](#col-3-background)
   - [mCHH in long TEs for cmt2-5
@@ -169,7 +174,7 @@ Johan Zicola
   - [Long TE methylation](#long-te-methylation)
     - [mCG](#mcg-6)
     - [mCHG](#mchg-6)
-    - [mCHH](#mchh-5)
+    - [mCHH](#mchh-6)
 - [RNA-seq library preparation](#rna-seq-library-preparation)
   - [Read trimming](#read-trimming)
   - [Mapping](#mapping)
@@ -214,6 +219,8 @@ Johan Zicola
     - [Analysis by CMT2 allele](#analysis-by-cmt2-allele)
     - [Analysis by FBX5 allele](#analysis-by-fbx5-allele)
     - [Permutation](#permutation)
+- [Author](#author)
+- [License](#license)
 
 # Overview
 
@@ -1399,15 +1406,12 @@ ggplot(data=df_subset, aes(x=country_code, y=percent_methylation)) + geom_boxplo
 
 # GWAS analysis
 
-## Download raw fastq reads
+## Download raw fastq reads whole-genome sequencing
 
-The paired-end sequencing data of the 189 CVI accessions from Santo
+The paired-end sequencing data of the 190 CVI accessions from Santo
 Antao were published in Fulgione et al., 2022 (DOI:
 10.1038/s41467-022-28800-z) and are available in ENA (accession code
-PRJEB39079 <https://www.ebi.ac.uk/ena/browser/view/PRJEB39079>). The
-accession Cvi-0 was sequenced and published in Alonso-Blanco et al.,
-2016 (DOI: 10.1016/j.cell.2016.05.063) and is available in the NCBI
-BioProject PRJNA273563.
+PRJEB39079 <https://www.ebi.ac.uk/ena/browser/view/PRJEB39079>).
 
 Data can be downloaded using fasterq-dump from SRA toolkit:
 
@@ -1436,9 +1440,9 @@ fasterq-dump : 3.2.1
 #SBATCH --error=slurm/%x.%A.%a.err
 #SBATCH --mail-type=END
 #SBATCH --mail-user=johan.zicola@uni-goettingen.de
-#SBATCH --array=1-189
+#SBATCH --array=1-190
 
-accession_ID=$(sed -n ${SLURM_ARRAY_TASK_ID}p WGS_ENA_data_189_SA.txt | cut -f1)
+accession_ID=$(sed -n ${SLURM_ARRAY_TASK_ID}p WGS_ENA_data_190_SA.txt | cut -f1)
 
 fasterq-dump $accession_ID --threads 6 --split-files -O raw_fastq/
 ```
@@ -1645,7 +1649,9 @@ path.file <- paste(dir_file, file.name, sep="")
 SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 ```
 
-![](images/GWAS_mCHG_whole_genome.png) \#### mCHH
+![](images/GWAS_mCHG_whole_genome.png)
+
+#### mCHH
 
 ``` r
 dir_file="data/output/"
@@ -1764,7 +1770,9 @@ path.file <- paste(dir_file, file.name, sep="")
 SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 ```
 
-![](images/GWAS_mCHH_genes.png) \### GWAS all TEs
+![](images/GWAS_mCHH_genes.png)
+
+### GWAS all TEs
 
 #### mCG
 
@@ -1921,7 +1929,9 @@ path.file <- paste(dir_file, file.name, sep="")
 SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 ```
 
-![](images/GWAS_mCHG_long_TEs.png) \##### Highlight FBX5 SNP
+![](images/GWAS_mCHG_long_TEs.png)
+
+##### Highlight FBX5 SNP
 
 ``` r
 source("scripts/functions_gwas.R")
@@ -3748,7 +3758,9 @@ ggplot(data = df_mean_subset, aes(x = pool, y = percent_methylation, group = poo
   scale_x_discrete(labels = c("Col-0", "SALK_082977", "FBX5-OE", "Col-3", "SAIL_190_D02", "SAILD_190_D02/arabidillo-2"))
 ```
 
-![](images/fbx5_mCHG_longTEs.png) \## mCHH in long TEs for FBX5 mutants
+![](images/fbx5_mCHG_longTEs.png)
+
+## mCHH in long TEs for FBX5 mutants
 
 ``` r
 df_name <- "df_mean_TEs_4kb"
@@ -3784,7 +3796,9 @@ ggplot(data = df_mean_subset, aes(x = pool, y = percent_methylation, group = poo
   ))
 ```
 
-![](images/fbx5_mCHH_long_TEs.png) \## Statistical tests
+![](images/fbx5_mCHH_long_TEs.png)
+
+## Statistical tests
 
 Check significance of difference between Col-0 and ara1-SALK and
 ARA1-OE, and Col-3 and ara12 and ara1-SAIL
@@ -5609,10 +5623,12 @@ p <- ggplot(pcaData, aes(PC1, PC2, color = sample, label = sample)) +
 p + geom_text(size = 4) + ggtitle("PCA TE expression replicates") + theme(plot.title = element_text(hjust = 0.5))
 ```
 
-![](images/PCA_replicates_TE_expression.png) Most replicates cluster
-together for the different accessions but it less clustered than for
-gene expression. Remove replicates to keep only one sample per
-accession. Remove Col-0 from the analysis. We end up with 97 samples.
+![](images/PCA_replicates_TE_expression.png)
+
+Most replicates cluster together for the different accessions but it
+less clustered than for gene expression. Remove replicates to keep only
+one sample per accession. Remove Col-0 from the analysis. We end up with
+97 samples.
 
 ### Analysis on single accessions and long TEs
 
@@ -5987,5 +6003,16 @@ p2 <- plot_permutation(nb_down_FBX5, 3, ylab = "# TEs log2FC < -2") + ggtitle("P
 grid.arrange(p1, p2, nrow = 1)
 ```
 
-![](images/permutation_TEs.png) Observed values (horizontal red lines)
-are above the permutation distribution.
+![](images/permutation_TEs.png)
+
+Observed values (horizontal red lines) are above the permutation
+distribution.
+
+# Author
+
+- **Johan Zicola** - [johanzi](https://github.com/johanzi)
+
+# License
+
+This project is licensed under the MIT License - see the
+[LICENSE](LICENSE) file for details
