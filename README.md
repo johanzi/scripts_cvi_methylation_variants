@@ -2,7 +2,7 @@ High impact mutations drive DNA methylation variation after colonization
 of a novel habitat
 ================
 Johan Zicola
-2025-05-26 14:05:18
+2025-05-27 14:11:23
 
 - [Overview](#overview)
 - [Softwares required](#softwares-required)
@@ -198,8 +198,6 @@ Johan Zicola
   - [Analysis without replicates (97
     accessions)](#analysis-without-replicates-97-accessions)
     - [DEG analysis by VIM2 allele](#deg-analysis-by-vim2-allele)
-    - [Expression of VIM3 based on VIM3
-      allele](#expression-of-vim3-based-on-vim3-allele)
 - [Analysis TE expression](#analysis-te-expression)
   - [R Libraries](#r-libraries-1)
   - [TE annotation](#te-annotation)
@@ -5024,6 +5022,15 @@ EnhancedVolcano(res,
 ```
 
 ![](images/volcano_plots_VIM2.png)
+[AT5G36100](https://www.arabidopsis.org/locus?key=132582) is the most
+significant and is upregulated in VIM2/4del. SLDP2 (SEED LIPID DROPLET
+PROTEIN2).Protein of unknown function that is found on the surfaces of
+lipid droplets and may function to anchor the droplets to the plasma
+membrane.
+
+This gene has two mCG DMRs in its downstream region:
+
+![](images/AT5G36100_snapshot.png)
 
 #### PCA analysis
 
@@ -5209,104 +5216,39 @@ with(vim24, t.test(VIM24_count[VIM2 == "0"], VIM24_count[VIM2 == "1"], var.equal
 
 Highly significant different between the two groups VIM2del and VIM2ref.
 
-``` r
-# Get data
-
-# Get data
-vim2 <- plotCounts(dds, gene = "AT1G66050", intgroup = "VIM3", main = "VIM2", returnData = T)
-vim4 <- plotCounts(dds, gene = "AT1G66040", intgroup = "VIM3", main = "VIM2", returnData = T)
-vim3 <- plotCounts(dds, gene = "AT5G39550", intgroup = "VIM3", main = "VIM2", returnData = T)
-
-vim24 <- cbind(vim2, vim4)
-
-# Create a new variable which summarizes the read count
-vim24$VIM24_count <- vim24[, 1] + vim24[, 3]
-
-# Remove extra VIM2 column
-vim24 <- vim24[, -2]
-
-# Highlight Cvi-0
-# Get library names
-library_Cvi_0 <- coldata %>%
-  filter(sample == "Cvi_0") %>%
-  rownames()
-
-# Get index corresponding in vim24 that got Col-0 removed
-index_cvi <- which(rownames(vim24) %in% library_Cvi_0)
-
-
-p1 <- ggboxplot(vim24, y = "VIM24_count", x = "VIM3", add = "jitter", title = "VIM2/4 (AT1G66050/AT1G66040") + theme(plot.title = element_text(hjust = 0.5)) + ylab("Normalized read count") + xlab("VIM2 allele") + geom_point(data = vim24[index_cvi, ], color = "red", pch = 18, cex = 3)
-
-p2 <- ggboxplot(vim3, y = "count", x = "VIM2", add = "jitter", title = "VIM3 (AT5G39550)") + ylab("Normalized read count") + xlab("VIM2 allele") + theme(plot.title = element_text(hjust = 0.5)) + geom_point(data = vim3[index_cvi, ], color = "red", pch = 18, cex = 3)
-
-grid.arrange(p1, p2, nrow = 1)
-```
-
-#### VIM3 expression based on VIM3 SNP
+#### Statistical test expression VIM3
 
 ``` r
-dds <- DESeqDataSetFromMatrix(
-  countData = cts,
-  colData = coldata,
-  design = ~VIM3
-)
+# Count number of genotype
+table(vim3$VIM2)
 
-keep <- rowSums(counts(dds)) >= 10
-dds <- dds[keep, ]
+library(onewaytests)
 
-## Generate expression model
-# Get the read count and perform 3 steps: estimation of size factors, estimation of dispersion
-# and negative binomial GLM fitting and Wald Statistics
-dds <- DESeq(dds)
+# Test if variances equals
+bartlett.test(count ~ VIM2, data = vim3)
 
+# Variance homogenous
 
-# Get data
-vim3 <- plotCounts(dds, gene = "AT5G39550", intgroup = "VIM3", main = "VIM3", returnData = T)
-
-# Highlight Cvi-0
-# Get library names
-library_Cvi_0 <- coldata %>%
-  filter(sample == "Cvi_0") %>%
-  rownames()
-
-# Get index corresponding in vim24 that got Col-0 removed
-index_cvi <- which(rownames(vim3) %in% library_Cvi_0)
-
-
-ggboxplot(vim3, y = "count", x = "VIM3", add = "jitter", title = "VIM3") + theme(plot.title = element_text(hjust = 0.5)) + ylab("Normalized read count") + xlab("VIM3 allele (Chr5:15047549)") + geom_point(data = vim3[index_cvi, ], color = "red", pch = 18, cex = 3)
+# Do t-test (two-tailed)
+with(vim3, t.test(count[VIM2 == "0"], count[VIM2 == "1"], var.equal = TRUE))
 ```
 
-### Expression of VIM3 based on VIM3 allele
+        Bartlett test of homogeneity of variances
 
-``` r
-dds <- DESeqDataSetFromMatrix(
-  countData = cts,
-  colData = coldata,
-  design = ~VIM2
-)
+    data:  count by VIM2
+    Bartlett's K-squared = 5.1689, df = 1, p-value = 0.02299
 
-keep <- rowSums(counts(dds)) >= 10
-dds <- dds[keep, ]
 
-plotCounts(dds,
-  gene = "AT5G39550", intgroup = "VIM2",
-  main = "VIM3 based on VIM2 allele", returnData = F
-)
+        Two Sample t-test
 
-dds <- DESeqDataSetFromMatrix(
-  countData = cts,
-  colData = coldata,
-  design = ~VIM3
-)
-
-keep <- rowSums(counts(dds)) >= 10
-dds <- dds[keep, ]
-
-plotCounts(dds,
-  gene = "AT5G39550", intgroup = "VIM3",
-  main = "VIM3 based on VIM3 allele", returnData = F
-)
-```
+    data:  count[VIM2 == "0"] and count[VIM2 == "1"]
+    t = 3.9866, df = 95, p-value = 0.0001316
+    alternative hypothesis: true difference in means is not equal to 0
+    95 percent confidence interval:
+      4.815942 14.370551
+    sample estimates:
+    mean of x mean of y 
+     37.33505  27.74180 
 
 # Analysis TE expression
 
