@@ -1,0 +1,111 @@
+# kmerGWAS - Ionomics - Santo Antao
+
+#### Directories
+
+* working directory: */srv/netscratch/irg/grp_hancock/johan/kmerGWAS/*
+* script directory: */home/tergemina/CVI_Project/computer/Methylome-SA/*
+* software: */srv/netscratch/irg/grp_hancock/Manu/software/kmersGWASv0.2/*
+
+#### Files needed for analysis
+
+* samples.txt
+This file corresponds to the list of samples to analyze
+
+```
+head samples.txt
+12912
+13172
+13173
+13175
+13179
+13183
+13578
+13580
+13581
+13582
+```
+
+* 83_fastqs.txt
+This file corresponds to the list of fastq files
+```
+head 83_fastqs.txt
+/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq/12766.R1.fastq.gz
+/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq/12766.R2.fastq.gz
+/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq/12849.R1.fastq.gz
+/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq/12849.R2.fastq.gz
+/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq/12911.R1.fastq.gz
+/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq/12911.R2.fastq.gz
+/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq/12912.R1.fastq.gz
+/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq/12912.R2.fastq.gz
+/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq/12914.R1.fastq.gz
+/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq/12914.R2.fastq.gz
+```
+
+#### First step: running KMC
+* Run kmers_methylome.SA.sh
+
+```bash
+KMC='/srv/netscratch/irg/grp_hancock/Manu/software/kmersGWASv0.2/external_programs/kmc_v3'
+BIN='/srv/netscratch/irg/grp_hancock/Manu/software/kmersGWASv0.2/bin/'
+DIR='/srv/netscratch/irg/grp_hancock/johan/kmerGWAS/'
+FASTQ='/srv/netscratch/irg/grp_hancock/johan/kmerGWAS/83_fastqs.txt'
+
+index=$LSB_JOBINDEX
+sample=$(sed -n ${index}p samples.txt)
+# sample=$(sed -n ${index}p list_fastq_SA_clean_test.txt) #For test version
+# sample=$1
+# echo $sample
+
+input_file="${DIR}samples/$sample/input_files_$sample.txt"
+mkdir ${DIR}samples/$sample
+grep -F ${sample}. $FASTQ > $input_file
+$KMC -t2 -k31 -ci2 @$input_file ${DIR}samples/$sample/kmc_canon ${DIR}samples/$sample > ${DIR}samples/$sample/kmc_canon.log.out
+$KMC -t2 -k31 -ci0 -b @$input_file ${DIR}samples/$sample/kmc_non_canon ${DIR}samples/$sample > ${DIR}samples/$sample/kmc_non_canon.log.out
+${BIN}kmers_add_strand_information -c ${DIR}samples/$sample/kmc_canon -n ${DIR}samples/$sample/kmc_non_canon -k 31 -o ${DIR}samples/$sample/kmers_with_strand > ${DIR}samples/$sample/add_strand.log.out
+rm ${DIR}samples/$sample/*.kmc*
+```
+Use an lsf array to use this script
+```bash
+bsub -q normal -R "rusage[mem=15000]" -M 17000 -n 4 -J "kmc[1-83]%10" < /home/tergemina/CVI_Project/computer/Methylome-SA/kmerGWAS_methylome_SA.sh
+```
+In this case, 10 jobs max will run simultaneously
+Note that it didn't work for 13175 so I remove it from the analysis from now on.
+
+#### Create k-mers list to be used in GWAS from all individuals
+```bash
+DIR=/srv/netscratch/irg/grp_hancock/johan/kmerGWAS/samples
+cat ./samples.txt | awk '{printf "'$DIR'/%s/kmers_with_strand\t%s\n",$1,$1}' > kmers_list_paths.txt
+```
+#### Filter k-mers from separate lists to one list with all k-mers to use
+```bash
+BIN=/srv/netscratch/irg/grp_hancock/Manu/software/kmersGWASv0.2/bin/
+${BIN}list_kmers_found_in_multiple_samples -l kmers_list_paths.txt -k 31 --mac 5 -p 0.2 -o kmers_to_use
+${BIN}build_kmers_table -l kmers_list_paths.txt -k 31 -a kmers_to_use -o kmers_table
+${BIN}emma_kinship_kmers -t kmers_table -k 31 --maf 0.05 > kmers_table.kinship
+```
+
+```bash
+bsub -q normal -R "rusage[mem=5000]" -M 7000 "/home/tergemina/CVI_Project/computer/Methylome-SA/combine_kmers_methylome_SA.sh"
+```
+
+
+
+
+## Run the GWAS
+```bash
+mkdir output_dir
+bsub -q multicore20 -R "rusage[mem=2000]" -M 5000 -n 15 -J "kmers[1-20]%3" < /home/tergemina/CVI_Project/computer/kmersGWAS/runGWASkmers.sh
+```
+
+## Prepare output from GWAS for Bowtie2
+Convert the *pass_threshold_10per* file of each phenotype into a multifasta file for bowtie2 alignment
+```bash
+python convertKmers4mapping.py
+```
+
+
+## Map kmers to TAIR10
+```bash
+python map_kmers_methylome_SA.py
+
+```

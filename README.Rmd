@@ -560,10 +560,10 @@ ggplot_all(df_mean_genes, title = title)
 
 require(gghighlight)
 
-df_accessions <- read.table("data/df_accessions_1001_CPV_MOR.txt",
+df_accessions <- read.table("data/methylKit_files/df_accessions_1001_CPV_MOR.txt",
                             header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
 
-path_DB <- "F:/NETSCRATCH/methylKit_DB_files/1001_project"
+path_DB <- "data/methylKit_files/1001GP"
 
 df_name <- "df_mean_genes"
 title <- "Weighted Methylation Level for genes"
@@ -3222,6 +3222,10 @@ python convertKmers4mapping.py
 python map_kmers_methylome_SA.py
 ```
 
+## Manhattan plot
+
+The plotting was performed on a Jupyter notebook. See [Methylome_plotting_202450610.ipynb](scripts/kmersGWAS/Methylome_plotting_202450610.html).
+
 
 # DMR analysis for VIM2
 
@@ -3658,7 +3662,7 @@ list_methylRawLists_TEs_4kb <- load_methylRawListDB(list_DB_paths, type="TEs_4kb
 ## Genome-wide methylation
 
 ```{r, fig.width=14, fig.height=5}
-path_DB <- "F:/NETSCRATCH/methylKit_DB_files/stroud_2013/"
+path_DB <- "data/methylKit_DB_files/stroud_2013/"
 
 df_name <- "df_mean_filtered"
 title <- "Weighted Methylation Genome-wide"
@@ -3743,7 +3747,8 @@ ggplot_all(get(df_name), title = title)
 ```{r}
 df_accessions <- read.table("data/df_accessions_all.txt", header = TRUE, stringsAsFactors = TRUE)
 
-path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
+path_DB <- "data/methylKit_DB_files/stroud_2013/"
+#path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
 
 df_name <- "df_mean_filtered_134"
 title <- "Weighted Methylation Level genome-wide"
@@ -3791,7 +3796,8 @@ ggplot(data = df_mean_CpG, aes(location, percent_methylation, fill = VIM2)) +
 ```{r}
 df_accessions <- read.table("data/df_accessions_all.txt", header = TRUE, stringsAsFactors = TRUE)
 
-path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
+path_DB <- "data/methylKit_DB_files/stroud_2013/"
+#path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
 
 df_name <- "df_mean_genes_134"
 title <- "Weighted Methylation Level for genes"
@@ -3842,7 +3848,8 @@ ggplot(data = df_mean_CpG, aes(location, percent_methylation, fill = VIM2)) +
 
 df_accessions <- read.table("data/df_accessions_all.txt", header = TRUE, stringsAsFactors = TRUE)
 
-path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
+path_DB <- "data/methylKit_DB_files/stroud_2013/"
+#path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
 
 df_name <- "df_mean_TEs_134"
 title <- "Weighted Methylation Level all TEs"
@@ -5498,99 +5505,7 @@ p + geom_text(size = 3) + ggtitle("PCA RNA-seq 97 samples") + theme(plot.title =
 
 ![](images/PCA_97_samples.png)
 
-#### DEG permutation
 
-Check how many DEGs we get if we permutate VIM2 alleles across the 97 samples.
-
-```{r}
-
-permutate_deseq2 <- function(allele_name, cts, coldata) {
-  coldata_shuffled <- coldata %>%
-    group_by(population) %>%
-    mutate(RAND = sample(get(allele_name)))
-
-  dds <- DESeqDataSetFromMatrix(
-    countData = cts,
-    colData = coldata_shuffled,
-    design = ~RAND
-  )
-
-  keep <- rowSums(counts(dds)) >= 10
-  dds <- dds[keep, ]
-
-  dds <- DESeq(dds, quiet = TRUE)
-
-  # Create a DESeqResults object
-  res <- results(dds)
-
-  sigDEG <- as.data.frame(res) %>%
-    rownames_to_column("geneID") %>%
-    filter(padj < 0.05)
-
-  # nb_TEs_overexpressed <- sum(sigDEG$log2FoldChange>0)
-
-  # return(nb_TEs_overexpressed)
-  return(sigDEG)
-}
-
-```
-
-```{r}
-
-# Create a population variable by spliting sample
-coldata_pop <- coldata %>%
-  separate(sample, c("population", "second", "third"), "_") %>%
-  dplyr::select(population)
-coldata$population <- coldata_pop$population
-coldata$population <- as.factor(coldata$population)
-coldata <- coldata %>% dplyr::select(seqID, sample, population, everything())
-
-permutation_DEG_VIM2 <- vector(mode = "list", length = 100)
-for (i in 1:100) {
-  permutation_DEG_VIM2[i] <- permutate_deseq2("VIM2", cts, coldata)
-}
-
-saveRDS(permutation_DEG_VIM2, "data/permutation_DEG_VIM2.Rds")
-
-
-```
-
-94 DEGs found. Among them, *VIM2/4* and *VIM3*.
-
-```{r}
-
-plot_permutation <- function(vector_permutation, observed_value) {
-  observed_value <- as.integer(observed_value)
-  vector_permutation <- as.vector(vector_permutation)
-
-  df <- as.data.frame(matrix(nrow = (length(vector_permutation) + 1), ncol = 1))
-
-  names(df) <- "value"
-
-  df$value <- as.integer(c(observed_value, vector_permutation))
-
-  ggplot(df, aes(x = "", y = value)) +
-    geom_boxplot(outlier.shape = NA) +
-    geom_point(position = position_jitter()) +
-    theme_bw() +
-    ylab("Number of significant DEGs") +
-    xlab("") +
-    geom_hline(yintercept = observed_value) +
-    theme(
-      axis.text.x = element_text(color = "black"),
-      axis.text.y = element_text(color = "black"),
-      axis.ticks = element_line(color = "black")
-    )
-}
-
-```
-
-```{r}
-value_sig_VIM2 <- readRDS("data/value_sig_DEG_VIM2_DEG_permutation.Rds")
-
-p1 <- plot_permutation(value_sig_VIM2, 94) + ggtitle("Permutation VIM2") +  theme(plot.title = element_text(hjust = 0.5))
-
-```
 
 #### VIM2/VIM4 and VIM3 expression
 
