@@ -2,7 +2,7 @@ High impact mutations drive DNA methylation variation after colonization
 of a novel habitat
 ================
 Johan Zicola
-2025-05-27 14:11:23
+2025-09-19 10:01:16
 
 - [Overview](#overview)
 - [Softwares required](#softwares-required)
@@ -79,13 +79,39 @@ Johan Zicola
   - [Plot diagram VIM2](#plot-diagram-vim2)
   - [Plot diagram CMT2](#plot-diagram-cmt2)
   - [Plot diagram FBX5](#plot-diagram-fbx5)
-- [Plot methylation by VIM2/4 allele](#plot-methylation-by-vim24-allele)
+- [Plot gbM by VIM2/4 allele](#plot-gbm-by-vim24-allele)
+- [Plot TE methylation by FBX5
+  allele](#plot-te-methylation-by-fbx5-allele)
+  - [mCG in long TEs](#mcg-in-long-tes)
+  - [mCHG in long TEs](#mchg-in-long-tes)
+    - [Statistics](#statistics)
+  - [mCHH in long TEs](#mchh-in-long-tes)
+    - [Statistics](#statistics-1)
+    - [Test difference mCHH for FBX5 in CMT2ref/stop
+      background](#test-difference-mchh-for-fbx5-in-cmt2refstop-background)
 - [GWAS gbM with VIM2/4 insertion as
   covariate](#gwas-gbm-with-vim24-insertion-as-covariate)
+- [GWAS mCG genome-wide with VIM2del as
+  covariate](#gwas-mcg-genome-wide-with-vim2del-as-covariate)
 - [GWAS mCHH long TEs with CMT2 as
   covariate](#gwas-mchh-long-tes-with-cmt2-as-covariate)
+- [GWAS mCHH genome-wide CMT2 as
+  covariate](#gwas-mchh-genome-wide-cmt2-as-covariate)
+- [GWAS mCHG genome-wide CMT2 as
+  covariate](#gwas-mchg-genome-wide-cmt2-as-covariate)
 - [GWAS mCG long TEs with FBX5 as
   covariate](#gwas-mcg-long-tes-with-fbx5-as-covariate)
+- [kmersGWAS](#kmersgwas)
+  - [Running KMC](#running-kmc)
+  - [Create k-mers list to be used in GWAS from all
+    individuals](#create-k-mers-list-to-be-used-in-gwas-from-all-individuals)
+  - [Filter k-mers from separate lists to one list with all k-mers to
+    use](#filter-k-mers-from-separate-lists-to-one-list-with-all-k-mers-to-use)
+  - [Run the GWAS](#run-the-gwas)
+  - [Prepare output from GWAS for
+    Bowtie2](#prepare-output-from-gwas-for-bowtie2)
+  - [Map kmers to TAIR10](#map-kmers-to-tair10)
+  - [Manhattan plot](#manhattan-plot)
 - [DMR analysis for VIM2](#dmr-analysis-for-vim2)
   - [Pooling of the data](#pooling-of-the-data)
   - [Run Bismark](#run-bismark-1)
@@ -148,6 +174,8 @@ Johan Zicola
     mutants](#mchg-in-long-tes-for-fbx5-mutants)
   - [mCHH in long TEs for FBX5
     mutants](#mchh-in-long-tes-for-fbx5-mutants)
+  - [mCHH in whole genome for FBX5
+    mutant](#mchh-in-whole-genome-for-fbx5-mutant)
   - [Statistical tests](#statistical-tests)
     - [Col-0 background](#col-0-background)
     - [Col-3 background](#col-3-background)
@@ -217,6 +245,16 @@ Johan Zicola
     - [Analysis by CMT2 allele](#analysis-by-cmt2-allele)
     - [Analysis by FBX5 allele](#analysis-by-fbx5-allele)
     - [Permutation](#permutation)
+- [Marginal genealogical tree with
+  RELATE](#marginal-genealogical-tree-with-relate)
+  - [VIM2](#vim2)
+  - [CMT2](#cmt2)
+  - [FBX5](#fbx5)
+- [Inference of selection
+  coefficient](#inference-of-selection-coefficient)
+  - [VIM2](#vim2-1)
+  - [CMT2](#cmt2-1)
+  - [FBX5](#fbx5-1)
 - [Author](#author)
 - [License](#license)
 
@@ -809,10 +847,10 @@ ggplot_all(df_mean_genes, title = title)
 ``` r
 require(gghighlight)
 
-df_accessions <- read.table("data/df_accessions_1001_CPV_MOR.txt",
+df_accessions <- read.table("data/methylKit_files/df_accessions_1001_CPV_MOR.txt",
                             header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
 
-path_DB <- "F:/NETSCRATCH/methylKit_DB_files/1001_project"
+path_DB <- "data/methylKit_files/1001GP"
 
 df_name <- "df_mean_genes"
 title <- "Weighted Methylation Level for genes"
@@ -979,7 +1017,6 @@ which(grepl(5856, df_subset$seq_ID))
 # 625
 
 # I get overlying grey and black dots for CPV and FO
-
 mycol <- rgb(0, 0, 0, max = 255, alpha = 0, names = "transparent")
 
 ggplot(data = df_subset, aes(x = country_code, y = percent_methylation)) +
@@ -1668,16 +1705,6 @@ SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
 #### mCG
 
 ``` r
-dir_file <- "Z:/output/"
-
-file.name <- "CpG_genes.assoc.clean.txt"
-
-path.file <- paste(dir_file, file.name, sep="")
-
-SNP_significant <- GWAS_run(path.file, threshold_pvalue = "bonferroni")
-```
-
-``` r
 dir_file="data/output/"
 
 file.name <- "CpG_genes.assoc.clean.txt"
@@ -2144,6 +2171,7 @@ java -Xmx18g -jar /usr/users/zicola/bin/snpEff/snpEff.jar \
     -c /usr/users/zicola/bin/snpEff/snpEff.config \
     Arabidopsis_thaliana subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.vcf \
     > subset_190_SA_alt_DP3_GQ25_wo_singletons_SA_only.recode.ann.vcf
+    
 ```
 
 Took 6 min. Output file is
@@ -2637,7 +2665,7 @@ ggplot(data = df, aes(population_nb, freq_derived)) +
 
 ![](images/FBX5_deletion_frequency.png)
 
-# Plot methylation by VIM2/4 allele
+# Plot gbM by VIM2/4 allele
 
 ``` r
 df_accessions <- read.table("data/df_accessions_83.txt", header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
@@ -2729,6 +2757,245 @@ with(df_mean[(df_mean$context=="CpG"),], t.test(percent_methylation[VIM2==0], pe
     mean of x mean of y 
     10.528693  7.580085 
 
+# Plot TE methylation by FBX5 allele
+
+## mCG in long TEs
+
+``` r
+df_accessions <- read.table("data/df_accessions_83.txt", header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
+
+path_DB <- "F:/NETSCRATCH/methylKit_DB_files/1001_project"
+
+df_name <- "df_mean_TEs_4kb"
+title <- "Weighted Methylation Level for genes"
+
+#get_df_wml(list_methylRawLists_genes, path_DB, df_name)
+
+load_df_wml(path_DB, df_name)
+
+# Merge dataframes of methylation levels and df_accessions to get detailed information about dataset
+df_mean <- merge(get(df_name), df_accessions, by="sample")
+
+df_mean$FBX5 <- as.factor(df_mean$FBX5)
+df_mean$CMT2 <- as.factor(df_mean$CMT2)
+df_mean$VIM2 <- as.factor(df_mean$VIM2)
+
+
+ggplot_per_context <- function(df, context, group){
+  
+  give.n <- function(x){
+    return(c(y = mean(x), label = length(x)))
+  }
+  
+  df_context <- df[(df$context == context),]
+
+  ggplot(data=df_context, aes_string(x=group, y="percent_methylation", group=group))+
+    ggtitle(paste(context, " methylation", sep="")) + theme_bw()+
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    geom_boxplot(outlier.shape = NA) +
+    geom_jitter(data=df_context[-82, ], height=.05, width=.05, size=0.8) +
+    geom_point(data=df_context[82,],size=2, fill="red", shape=23, width=0.1, height=0) +
+   stat_summary(fun.data = give.n, geom = "text", position = position_stack(vjust = 0.7)) +
+    coord_cartesian(ylim=c(72,84)) +
+    scale_y_continuous(breaks=c(seq(72,94,2)))
+}
+
+ggplot_per_context(df_mean, "CpG", "FBX5") + xlab("") + 
+  ylab("% of methylated cytosines (CG)") + ggtitle("mCG at long TEs")
+```
+
+![](images/mCG_long_TEs_FBX5.png) \### Statistics
+
+``` r
+library(onewaytests)
+
+# Test if variances equals
+bartlett.test(percent_methylation~FBX5, data=df_mean[(df_mean$context=="CpG"),])
+# Variances not equal => use Welch's test
+
+welch.test(percent_methylation~FBX5, data = df_mean[(df_mean$context=="CpG"),], alpha=0.05)
+
+#with(df_mean[(df_mean$context=="CpG"),], t.test(percent_methylation[FBX5==0], percent_methylation[FBX5==1], var.equal=FALSE))
+```
+
+
+        Bartlett test of homogeneity of variances
+
+    data:  percent_methylation by FBX5
+    Bartlett's K-squared = 4.812, df = 1, p-value = 0.02826
+
+      Welch's Heteroscedastic F Test (alpha = 0.05) 
+    ------------------------------------------------------------- 
+      data : percent_methylation and FBX5 
+
+      statistic  : 172.1605 
+      num df     : 1 
+      denom df   : 80.77658 
+      p.value    : 1.015067e-21 
+
+      Result     : Difference is statistically significant. 
+    ------------------------------------------------------------- 
+
+## mCHG in long TEs
+
+``` r
+ggplot_per_context <- function(df, context, group){
+  
+  give.n <- function(x){
+    return(c(y = mean(x), label = length(x)))
+  }
+  
+  df_context <- df[(df$context == context),]
+
+  ggplot(data=df_context, aes_string(x=group, y="percent_methylation", group=group))+
+    ggtitle(paste(context, " methylation", sep="")) + theme_bw()+
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    geom_boxplot(outlier.shape = NA) +
+    geom_jitter(data=df_context[-82, ], height=.05, width=.05, size=0.8) +
+    geom_point(data=df_context[82,],size=2, fill="red", shape=23, width=0.1, height=0) +
+   stat_summary(fun.data = give.n, geom = "text", position = position_stack(vjust = 0.7)) +
+    coord_cartesian(ylim=c(38,56)) +
+    scale_y_continuous(breaks=c(seq(38,56,2)))
+}
+
+ggplot_per_context(df_mean, "CHG", "FBX5") + xlab("") + 
+  ylab("% of methylated cytosines (CHG)") + ggtitle("mCHG at long TEs")
+```
+
+![](images/mCHG_long_TEs_FBX5.png)
+
+### Statistics
+
+``` r
+library(onewaytests)
+
+# Test if variances equals
+bartlett.test(percent_methylation~FBX5, data=df_mean[(df_mean$context=="CHG"),])
+# Variances equal => use T test
+
+#welch.test(percent_methylation~FBX5, data = df_mean[(df_mean$context=="CpG"),], alpha=0.05)
+
+with(df_mean[(df_mean$context=="CHG"),], t.test(percent_methylation[FBX5==0], percent_methylation[FBX5==1], var.equal=TRUE))
+```
+
+
+        Bartlett test of homogeneity of variances
+
+    data:  percent_methylation by FBX5
+    Bartlett's K-squared = 1.4562, df = 1, p-value = 0.2275
+
+        Two Sample t-test
+
+    data:  percent_methylation[FBX5 == 0] and percent_methylation[FBX5 == 1]
+    t = -7.5565, df = 81, p-value = 5.582e-11
+    alternative hypothesis: true difference in means is not equal to 0
+    95 percent confidence interval:
+     -4.918492 -2.868187
+    sample estimates:
+    mean of x mean of y 
+     45.36060  49.25394 
+
+## mCHH in long TEs
+
+``` r
+ggplot_per_context <- function(df, context, group){
+  
+  give.n <- function(x){
+    return(c(y = mean(x), label = length(x)))
+  }
+  
+  df_context <- df[(df$context == context),]
+
+  ggplot(data=df_context, aes_string(x=group, y="percent_methylation", color="CMT2"))+
+    theme_bw()+
+    geom_boxplot(outlier.shape = NA) +
+    geom_point(data=df[-82,], position=position_jitterdodge(), size=1) +
+    geom_jitter(data=df[82, ],size=3, fill="white", shape=23, width=0.1, height=0) +
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_y_continuous(limits=c(0,14), breaks=seq(0,14,2))
+  
+}
+
+ggplot_per_context(df_mean, "CHH", "FBX5") + xlab("FBX5 allele") + ylab("% of methylated cytosines (CHH)")
+```
+
+![](images/mCHH_long_TEs_FBX5_CMT2.png) We have 2% of mCHH in FBX5stop
+vs 1.2% in FBX5ref.
+
+``` r
+df_mean %>% filter(context=="CHH") %>% group_by(FBX5, CMT2) %>% summarize(meth=mean(percent_methylation), sd=sd(percent_methylation)) %>% knitr::kable()
+```
+
+| FBX5 | CMT2 |      meth |        sd |
+|:-----|:-----|----------:|----------:|
+| 0    | 0    | 10.618035 | 1.3241299 |
+| 0    | 1    |  2.562190 | 0.4001650 |
+| 1    | 0    | 11.741630 | 0.9626544 |
+| 1    | 1    |  2.865667 | 0.8650467 |
+
+### Statistics
+
+### Test difference mCHH for FBX5 in CMT2ref/stop background
+
+Note that all these stats are probably better explained by a linear
+model integrating the different genes as factor (see part linear model)
+
+Test difference in CMT2ref background
+
+``` r
+require(onewaytests)
+
+df_mean_formated_CMT2stop <- df_mean_formated %>% filter(df_mean_formated$CMT2==0) %>% filter(context=="CHH")
+
+bartlett.test(percent_methylation~FBX5, data=df_mean_formated_CMT2stop)
+# Variances equal
+
+with(df_mean_formated_CMT2stop[(df_mean_formated_CMT2stop$context=="CHH"),], t.test(percent_methylation[FBX5==0], percent_methylation[FBX5==1], var.equal=TRUE))
+```
+
+    data:  percent_methylation by FBX5
+    Bartlett's K-squared = 3.0462, df = 1, p-value = 0.08093
+
+
+        Two Sample t-test
+
+    data:  percent_methylation[FBX5 == 0] and percent_methylation[FBX5 == 1]
+    t = -3.1466, df = 54, p-value = 0.002688
+    alternative hypothesis: true difference in means is not equal to 0
+    95 percent confidence interval:
+     -0.4622313 -0.1024430
+    sample estimates:
+    mean of x mean of y 
+     1.919552  2.201889 
+
+Test difference in CMT2stop background
+
+``` r
+df_mean_formated_CMT2ref <- df_mean_formated %>% filter(df_mean_formated$CMT2==1) %>% filter(context=="CHH")
+
+bartlett.test(percent_methylation~FBX5, data=df_mean_formated_CMT2ref)
+# Variances equal
+
+with(df_mean_formated_CMT2ref[(df_mean_formated_CMT2ref$context=="CHH"),], t.test(percent_methylation[FBX5==0], percent_methylation[FBX5==1], var.equal=TRUE))
+```
+
+        Bartlett test of homogeneity of variances
+
+    data:  percent_methylation by FBX5
+    Bartlett's K-squared = 1.3303, df = 1, p-value = 0.2487
+
+
+        Two Sample t-test
+
+    data:  percent_methylation[FBX5 == 0] and percent_methylation[FBX5 == 1]
+    t = -0.95461, df = 25, p-value = 0.3489
+    alternative hypothesis: true difference in means is not equal to 0
+    95 percent confidence interval:
+     -0.5672242  0.2079338
+    sample estimates:
+    mean of x mean of y 
+     1.166271  1.345917 
+
 # GWAS gbM with VIM2/4 insertion as covariate
 
 Perform GWAS using a new VCF file which contains the VIM2 deletion.
@@ -2783,12 +3050,10 @@ cd /srv/netscratch/irg/grp_hancock/johan/GWAS/dna_methylation/GWAS_83_SA
 # Create file withs first column of 1s, second column with the VIM2 deletion genotype
 awk -v OFS="\t" '{print "1",$1}' accessions_83_order_genotype_VIM2_del.txt > covariate_VIM2.txt
 
-path_run_gwas="/home/zicola/SCRIPTS/GWAS_scripts/gemma_pipeline/"
-
 VCF="subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons_plus_VIM_del.recode.vcf.gz"
 
 # Run GWAS for gbM
-bash ${path_run_gwas}/run_gwas_gemma.sh CpG_genes.tsv $VCF covariate_VIM2.txt
+bash ../scripts/run_gwas_gemma.sh CpG_genes.tsv vcf_files/$VCF covariate_VIM2.txt
 ```
 
 ``` r
@@ -2831,6 +3096,55 @@ manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$
 
 ![](images/GWAS_mCG_genes_VIM2del_covariate.png)
 
+# GWAS mCG genome-wide with VIM2del as covariate
+
+``` bash
+VCF="subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons_plus_VIM_del.recode.vcf.gz"
+
+# Run GWAS for gbM
+bash ../scripts/run_gwas_gemma.sh CpG_whole_genome.tsv vcf_files/$VCF covariate_VIM2.txt
+```
+
+``` r
+source("scripts/functions_gwas.R")
+
+dir_file <- "data/output/"
+
+file.name <- "CpG_whole_genome_covariate_VIM2.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+gwas.results <- read.delim(path.file, sep="\t")
+
+nb_snps <- dim(gwas.results)[[1]]
+
+## Calculate Bonferroni corrected P-value threshold
+bonferroni_threshold <- 0.05/nb_snps
+
+threshold_pvalue <- bonferroni_threshold
+
+# Check code https://genome.sph.umich.edu/wiki/Code_Sample:_Generating_Manhattan_Plots_in_R
+#source("manhattan_plot_fun.R")
+
+# Remove dots below 0.5 to reduce size of PDF and lag in Inkscape
+#gwas.results <- gwas.results %>% filter(-log(P) > 0.5)
+
+# Won't work if no SNPs within the gene region, make a larger range to get some SNPs to be displayed
+VIM2 <- c(24589343,24592780)
+
+# Add n bp before and after the gene coordinates to widen the regions to find. I played by adding 0 until I could see the 4 genes on the plot
+n = 50000
+VIM2 <- c(VIM2[[1]]-n, VIM2[[2]]+n)
+
+ann<-rep(1, length(gwas.results$P))
+ann[with(gwas.results, CHR==1 & BP>=VIM2[[1]] & BP<VIM2[[2]])]<-2
+ann<-factor(ann, levels=1:2, labels=c("","VIM2"))
+
+manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$P, annotate=ann, sig.level=bonferroni_threshold, title=file.name)
+```
+
+![](images/GWAS_mCG_whole_genome_VIM2_covariate.png)
+
 # GWAS mCHH long TEs with CMT2 as covariate
 
 ``` bash
@@ -2843,7 +3157,7 @@ awk -v OFS="\t" '{print "1",$1}' accessions_83_order_genotype_CMT2.txt > covaria
 
 VCF="subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz"
 
-bash ${path_run_gwas}/run_gwas_gemma.sh CHH_TEs_4kb.tsv $VCF covariate_CMT2.txt
+bash ../scripts/run_gwas_gemma.sh CHH_TEs_4kb.tsv vcf_files/$VCF covariate_CMT2.txt
 ```
 
 ``` r
@@ -2872,9 +3186,97 @@ manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$
 
 ![](images/GWAS_mCHH_long_TEs_CMT2_covariate.png)
 
+# GWAS mCHH genome-wide CMT2 as covariate
+
+``` bash
+
+# Note I use sort as that is how the accessions seq_ID is sorted in the VCF file
+cut -f2,6 df_accessions_83.txt | sort | grep -v "seq_ID" - | cut -f2  > accessions_83_order_genotype_CMT2.txt
+
+# Create file withs first column of 1s, second column with the CMT2 genotype
+awk -v OFS="\t" '{print "1",$1}' accessions_83_order_genotype_CMT2.txt > covariate_CMT2.txt
+
+
+VCF="subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz"
+
+# Whole genome
+bash ../scripts/run_gwas_gemma.sh CHH_whole_genome.tsv vcf_files/$VCF covariate_CMT2.txt
+```
+
+``` r
+source("scripts/functions_gwas.R")
+
+dir_file <- "data/output/"
+
+file.name <- "CHH_whole_genome_covariate_CMT2.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+gwas.results <- read.delim(path.file, sep="\t")
+
+nb_snps <- dim(gwas.results)[[1]]
+
+## Calculate Bonferroni corrected P-value threshold
+bonferroni_threshold <- 0.05/nb_snps
+
+threshold_pvalue <- bonferroni_threshold
+
+ann<-rep(1, length(gwas.results$P))
+#ann<-factor(ann, levels=1:2, labels=c("","VIM2"))
+
+manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$P, annotate=ann, sig.level=bonferroni_threshold, title="GWAS for mCHH genome-wide with CMT2stop SNP as covariate")
+```
+
+![](images/GWAS_mCHH_whole_genome_CMT2_covariate.png)
+
+# GWAS mCHG genome-wide CMT2 as covariate
+
+``` bash
+cd data
+
+# Note I use sort as that is how the accessions seq_ID is sorted in the VCF file
+cut -f2,6 df_accessions_83.txt | sort | grep -v "seq_ID" - | cut -f2  > accessions_83_order_genotype_CMT2.txt
+
+# Create file withs first column of 1s, second column with the CMT2 genotype
+awk -v OFS="\t" '{print "1",$1}' accessions_83_order_genotype_CMT2.txt > covariate_CMT2.txt
+
+
+VCF="subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz"
+
+bash ../scripts/run_gwas_gemma.sh CHG_whole_genome.tsv vcf_files/$VCF covariate_CMT2.txt
+```
+
+``` r
+source("scripts/functions_gwas.R")
+
+dir_file <- "data/output/"
+
+file.name <- "CHG_whole_genome_covariate_CMT2.assoc.clean.txt"
+
+path.file <- paste(dir_file, file.name, sep="")
+
+gwas.results <- read.delim(path.file, sep="\t")
+
+nb_snps <- dim(gwas.results)[[1]]
+
+## Calculate Bonferroni corrected P-value threshold
+bonferroni_threshold <- 0.05/nb_snps
+
+threshold_pvalue <- bonferroni_threshold
+
+ann<-rep(1, length(gwas.results$P))
+#ann<-factor(ann, levels=1:2, labels=c("","VIM2"))
+
+manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$P, annotate=ann, sig.level=bonferroni_threshold, title="GWAS for mCHG genome-wide with CMT2stop SNP as covariate")
+```
+
+![](images/GWAS_mCHG_whole_genome_CMT2_covariate.png)
+
 # GWAS mCG long TEs with FBX5 as covariate
 
 ``` bash
+cd data
+
 # Sort by seqID to be in the order used in the VCF file
 sort -k2 df_accessions_83.txt > df_accessions_83_seqID_sorted.txt 
 
@@ -2916,6 +3318,124 @@ manhattan.plot(chr = gwas.results$CHR, pos=gwas.results$BP, pvalue=gwas.results$
 ```
 
 ![](images/GWAS_mCG_long_TEs_FBX5_covariate.png)
+
+# kmersGWAS
+
+kmersGWAS software GitHub repository:
+<https://github.com/voichek/kmersGWAS> (version 2.0 used
+<https://github.com/voichek/kmersGWAS/releases/tag/v0.2-beta>). Download
+zip file `v0.2-beta`.
+
+``` bash
+mkdir ~/kmersGWAS
+
+mv v0.2-beta.zip ~/kmersGWAS
+
+cd ~/kmersGWAS && unzip v0.2-beta
+
+make
+```
+
+The fastq files for all 83 accessions used for GWAS are needed (see
+Supplementary Table 14 for ENA accession numbers).
+
+## Running KMC
+
+`kmers_methylome.SA.sh`
+
+``` bash
+
+KMC='~/kmersGWAS/external_programs/kmc_v3'
+BIN='~/kmersGWAS/bin/'
+DIR='~/output_kmersGWAS/'
+FASTQ='~/path_to_fastq.txt'
+
+index=$LSB_JOBINDEX
+sample=$(sed -n ${index}p samples.txt)
+
+input_file="${DIR}samples/$sample/input_files_$sample.txt"
+
+mkdir ${DIR}samples/$sample
+
+grep -F ${sample}. $FASTQ > $input_file
+
+$KMC -t2 -k31 -ci2 @$input_file ${DIR}samples/$sample/kmc_canon \
+  ${DIR}samples/$sample > ${DIR}samples/$sample/kmc_canon.log.out
+
+$KMC -t2 -k31 -ci0 -b @$input_file \
+  ${DIR}samples/$sample/kmc_non_canon \
+    ${DIR}samples/$sample > ${DIR}samples/$sample/kmc_non_canon.log.out
+
+${BIN}kmers_add_strand_information -c ${DIR}samples/$sample/kmc_canon \
+  -n ${DIR}samples/$sample/kmc_non_canon -k 31 \
+  -o ${DIR}samples/$sample/kmers_with_strand > ${DIR}samples/$sample/add_strand.log.out
+
+rm ${DIR}samples/$sample/*.kmc*
+```
+
+Use an lsf array to use `kmers_methylome.SA.sh`:
+
+``` bash
+bsub -q normal -R "rusage[mem=15000]" \
+  -M 17000 -n 4 -J "kmc[1-83]%10" < kmerGWAS_methylome_SA.sh
+```
+
+## Create k-mers list to be used in GWAS from all individuals
+
+``` bash
+# Make a list of all output from KMC
+DIR='~/output_kmersGWAS/samples'
+cat ./samples.txt | awk '{printf "'$DIR'/%s/kmers_with_strand\t%s\n",$1,$1}' > kmers_list_paths.txt
+```
+
+## Filter k-mers from separate lists to one list with all k-mers to use
+
+`combine_kmers_methylome_SA.sh`
+
+``` bash
+
+BIN='~/kmersGWAS/bin/'
+
+${BIN}list_kmers_found_in_multiple_samples \
+  -l kmers_list_paths.txt \
+    -k 31 --mac 5 -p 0.2 -o kmers_to_use
+
+${BIN}build_kmers_table -l kmers_list_paths.txt -k 31 \
+  -a kmers_to_use -o kmers_table
+
+${BIN}emma_kinship_kmers -t kmers_table -k 31 --maf 0.05 > kmers_table.kinship
+```
+
+``` bash
+bsub -q normal -R "rusage[mem=5000]" -M 7000 combine_kmers_methylome_SA.sh
+```
+
+## Run the GWAS
+
+``` bash
+mkdir output_dir
+bsub -q multicore20 -R "rusage[mem=2000]" -M 5000 -n 15 -J "kmers[1-20]%3" < /home/tergemina/CVI_Project/computer/kmersGWAS/runGWASkmers.sh
+```
+
+## Prepare output from GWAS for Bowtie2
+
+Convert the *pass_threshold_10per* file of each phenotype into a
+multifasta file for bowtie2 alignment
+
+``` bash
+python convertKmers4mapping.py
+```
+
+## Map kmers to TAIR10
+
+``` bash
+python map_kmers_methylome_SA.py
+```
+
+## Manhattan plot
+
+The plotting was performed on a Jupyter notebook. See
+[Methylome_plotting_202450610.ipynb](scripts/kmersGWAS/Methylome_plotting_202450610.html).
 
 # DMR analysis for VIM2
 
@@ -3362,7 +3882,7 @@ list_methylRawLists_TEs_4kb <- load_methylRawListDB(list_DB_paths, type="TEs_4kb
 ## Genome-wide methylation
 
 ``` r
-path_DB <- "F:/NETSCRATCH/methylKit_DB_files/stroud_2013/"
+path_DB <- "data/methylKit_DB_files/stroud_2013/"
 
 df_name <- "df_mean_filtered"
 title <- "Weighted Methylation Genome-wide"
@@ -3439,7 +3959,8 @@ ggplot_all(get(df_name), title = title)
 ``` r
 df_accessions <- read.table("data/df_accessions_all.txt", header = TRUE, stringsAsFactors = TRUE)
 
-path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
+path_DB <- "data/methylKit_DB_files/stroud_2013/"
+#path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
 
 df_name <- "df_mean_filtered_134"
 title <- "Weighted Methylation Level genome-wide"
@@ -3486,7 +4007,8 @@ ggplot(data = df_mean_CpG, aes(location, percent_methylation, fill = VIM2)) +
 ``` r
 df_accessions <- read.table("data/df_accessions_all.txt", header = TRUE, stringsAsFactors = TRUE)
 
-path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
+path_DB <- "data/methylKit_DB_files/stroud_2013/"
+#path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
 
 df_name <- "df_mean_genes_134"
 title <- "Weighted Methylation Level for genes"
@@ -3535,7 +4057,8 @@ ggplot(data = df_mean_CpG, aes(location, percent_methylation, fill = VIM2)) +
 ``` r
 df_accessions <- read.table("data/df_accessions_all.txt", header = TRUE, stringsAsFactors = TRUE)
 
-path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
+path_DB <- "data/methylKit_DB_files/stroud_2013/"
+#path_DB <- "F:/NETSCRATCH/methylKit_DB_files/GC_3427_3542_3599_4050_4220_4373_TAIR10"
 
 df_name <- "df_mean_TEs_134"
 title <- "Weighted Methylation Level all TEs"
@@ -3795,6 +4318,42 @@ ggplot(data = df_mean_subset, aes(x = pool, y = percent_methylation, group = poo
 ```
 
 ![](images/fbx5_mCHH_long_TEs.png)
+
+## mCHH in whole genome for FBX5 mutant
+
+``` r
+df_name <- "df_mean_filtered"
+title <- "Weighted Methylation Level for long TEs (>4 kb)"
+
+get_df_wml(list_methylRawLists_TEs_4kb, path_DB, df_name)
+load_df_wml(path_DB, df_name)
+
+# Merge methylation levels and df_accessions for detailed information
+df_mean <- merge(get(df_name), df_accessions, by = "sample")
+
+df_mean_subset <- df_mean %>%
+  filter(context == "CHH") %>%
+  filter(!pool %in% c("cmt2-5", "cmt2", "S27-204", "Cvi-0"))
+
+order_pool <- c("Col-0", "ara1-SALK", "ARA1-OE", "Col-3", "ara1-SAIL", "ara12")
+
+df_mean_subset$pool <- factor(df_mean_subset$pool, levels = order_pool, ordered = TRUE)
+
+ggplot(data = df_mean_subset, aes(x = pool, y = percent_methylation, group = pool)) +
+  geom_boxplot(outlier.size = 1) +
+  geom_jitter(height = .05, width = .05, size = 1) +
+  theme_bw() +
+  ylab("% methylated cytosines (CHH)") +
+  ggtitle("CHH methylation in long TEs") +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("") +
+  scale_y_continuous(limits = c(8, 14), breaks = seq(8, 14, 2)) +
+  scale_x_discrete(labels = c(
+    "Col-0", "SALK_082977", "FBX5-OE", "Col-3",
+    "SAIL_190_D02", "SAILD_190_D02/arabidillo-2"
+  ))
+```
 
 ## Statistical tests
 
@@ -4448,16 +5007,19 @@ lm1 <- aov(percent_methylation ~ genotype, data=df_fbx5_CHH)
 summary(glht(lm1, linfct=mcp(genotype="Dunnett"), alternative="two.sided"))
 ```
 
-Simultaneous Tests for General Linear Hypotheses
+     Simultaneous Tests for General Linear Hypotheses
 
-Multiple Comparisons of Means: Dunnett Contrasts
+    Multiple Comparisons of Means: Dunnett Contrasts
 
-Fit: aov(formula = percent_methylation ~ genotype, data = df_fbx5_CHH)
 
-Linear Hypotheses: Estimate Std. Error t value Pr(\>\|t\|) fbx5_8_9 -
-S7_B5 == 0 -1.963 1.056 -1.860 0.223 fbx5_12_3 - S7_B5 == 0 0.100 1.056
-0.095 0.999 fbx5_3_23 - S7_B5 == 0 -0.250 1.056 -0.237 0.990 (Adjusted p
-values reported – single-step method)
+    Fit: aov(formula = percent_methylation ~ genotype, data = df_fbx5_CHH)
+
+    Linear Hypotheses:
+                           Estimate Std. Error t value Pr(>|t|)
+    fbx5_8_9 - S7_B5 == 0    -1.963      1.056  -1.860    0.223
+    fbx5_12_3 - S7_B5 == 0    0.100      1.056   0.095    0.999
+    fbx5_3_23 - S7_B5 == 0   -0.250      1.056  -0.237    0.990
+    (Adjusted p values reported -- single-step method)
 
 # RNA-seq library preparation
 
@@ -5022,6 +5584,7 @@ EnhancedVolcano(res,
 ```
 
 ![](images/volcano_plots_VIM2.png)
+
 [AT5G36100](https://www.arabidopsis.org/locus?key=132582) is the most
 significant and is upregulated in VIM2/4del. SLDP2 (SEED LIPID DROPLET
 PROTEIN2).Protein of unknown function that is found on the surfaces of
@@ -5053,93 +5616,6 @@ p + geom_text(size = 3) + ggtitle("PCA RNA-seq 97 samples") + theme(plot.title =
 ```
 
 ![](images/PCA_97_samples.png)
-
-#### DEG permutation
-
-Check how many DEGs we get if we permutate VIM2 alleles across the 97
-samples.
-
-``` r
-permutate_deseq2 <- function(allele_name, cts, coldata) {
-  coldata_shuffled <- coldata %>%
-    group_by(population) %>%
-    mutate(RAND = sample(get(allele_name)))
-
-  dds <- DESeqDataSetFromMatrix(
-    countData = cts,
-    colData = coldata_shuffled,
-    design = ~RAND
-  )
-
-  keep <- rowSums(counts(dds)) >= 10
-  dds <- dds[keep, ]
-
-  dds <- DESeq(dds, quiet = TRUE)
-
-  # Create a DESeqResults object
-  res <- results(dds)
-
-  sigDEG <- as.data.frame(res) %>%
-    rownames_to_column("geneID") %>%
-    filter(padj < 0.05)
-
-  # nb_TEs_overexpressed <- sum(sigDEG$log2FoldChange>0)
-
-  # return(nb_TEs_overexpressed)
-  return(sigDEG)
-}
-```
-
-``` r
-# Create a population variable by spliting sample
-coldata_pop <- coldata %>%
-  separate(sample, c("population", "second", "third"), "_") %>%
-  dplyr::select(population)
-coldata$population <- coldata_pop$population
-coldata$population <- as.factor(coldata$population)
-coldata <- coldata %>% dplyr::select(seqID, sample, population, everything())
-
-permutation_DEG_VIM2 <- vector(mode = "list", length = 100)
-for (i in 1:100) {
-  permutation_DEG_VIM2[i] <- permutate_deseq2("VIM2", cts, coldata)
-}
-
-saveRDS(permutation_DEG_VIM2, "data/permutation_DEG_VIM2.Rds")
-```
-
-94 DEGs found. Among them, *VIM2/4* and *VIM3*.
-
-``` r
-plot_permutation <- function(vector_permutation, observed_value) {
-  observed_value <- as.integer(observed_value)
-  vector_permutation <- as.vector(vector_permutation)
-
-  df <- as.data.frame(matrix(nrow = (length(vector_permutation) + 1), ncol = 1))
-
-  names(df) <- "value"
-
-  df$value <- as.integer(c(observed_value, vector_permutation))
-
-  ggplot(df, aes(x = "", y = value)) +
-    geom_boxplot(outlier.shape = NA) +
-    geom_point(position = position_jitter()) +
-    theme_bw() +
-    ylab("Number of significant DEGs") +
-    xlab("") +
-    geom_hline(yintercept = observed_value) +
-    theme(
-      axis.text.x = element_text(color = "black"),
-      axis.text.y = element_text(color = "black"),
-      axis.ticks = element_line(color = "black")
-    )
-}
-```
-
-``` r
-value_sig_VIM2 <- readRDS("data/value_sig_DEG_VIM2_DEG_permutation.Rds")
-
-p1 <- plot_permutation(value_sig_VIM2, 94) + ggtitle("Permutation VIM2") +  theme(plot.title = element_text(hjust = 0.5))
-```
 
 #### VIM2/VIM4 and VIM3 expression
 
@@ -5950,9 +6426,271 @@ grid.arrange(p1, p2, nrow = 1)
 Observed values (horizontal red lines) are above the permutation
 distribution.
 
+# Marginal genealogical tree with RELATE
+
+Install the RELATE software from <https://myersgroup.github.io/relate/>
+(see paper <https://www.nature.com/articles/s41588-019-0484-x>).
+
+## VIM2
+
+``` bash
+RELATE="/path_to_RELATE/Relate"
+
+bp=24586731
+
+## Relate
+${RELATE}/bin/Relate \
+--mode All \
+--haps chr1_SantoAntao_haploid.haps \
+--sample chr1_SantoAntao_haploid.sample \
+--map chr1_recmap.map \
+--memory 20 --coal SA_relate_popsize.coal -m 2.2131e-09 \
+-o  chr1_relate
+
+# SampleBranchLengths (--format a)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr1_relate \
+-o chr1_relate_resample200 \
+-m 2.2131e-09 \
+--coal SA_relate_popsize.coal \
+--format a \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+# SampleBranchLengths (CLUES)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr1_relate \
+-o chr1_relate_resample200_CLUES \
+-m 2.2131e-09 \
+--coal SA_relate_popsize.coal \
+--format b \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+## TreeViewMutation
+${RELATE}/scripts/TreeView/TreeViewMutation.sh \
+--haps chr1_SantoAntao_haploid.haps \
+--sample chr1_SantoAntao_haploid.sample \
+--anc chr1_relate.anc \
+--mut chr1_relate.mut \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_mutation_VIM2
+
+## TreeViewSample
+${RELATE}/scripts/TreeView/TreeViewSample.sh \
+--haps chr1_SantoAntao_haploid.haps \
+--sample chr1_SantoAntao_haploid.sample \
+--anc chr1_relate_resample200.anc \
+--mut chr1_relate_resample200.mut \
+--dist chr1_relate_resample200.dist \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_sample_VIM2
+```
+
+## CMT2
+
+``` bash
+RELATE="/path_to_RELATE/Relate"
+
+bp=10707974
+
+## Relate
+${RELATE}/bin/Relate \
+--mode All \
+--haps chr4_SantoAntao_haploid.haps \
+--sample chr4_SantoAntao_haploid.sample \
+--map chr4_recmap.map \
+--memory 20 --coal SA_relate_popsize.coal -m 2.142e-09 \
+-o  chr4_relate
+
+# SampleBranchLengths (--format a)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr4_relate \
+-o chr4_relate_resample200 \
+-m 2.142e-09 \
+--coal SA_relate_popsize.coal \
+--format a \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+# SampleBranchLengths (CLUES)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr4_relate \
+-o chr4_relate_resample200_CLUES \
+-m 2.142e-09 \
+--coal SA_relate_popsize.coal \
+--format b \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+## TreeViewMutation
+${RELATE}/scripts/TreeView/TreeViewMutation.sh \
+--haps chr4_SantoAntao_haploid.haps \
+--sample chr4_SantoAntao_haploid.sample \
+--anc chr4_relate.anc \
+--mut chr4_relate.mut \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_mutation_CMT2
+
+## TreeViewSample
+${RELATE}/scripts/TreeView/TreeViewSample.sh \
+--haps chr4_SantoAntao_haploid.haps \
+--sample chr4_SantoAntao_haploid.sample \
+--anc chr4_relate_resample200.anc \
+--mut chr4_relate_resample200.mut \
+--dist chr4_relate_resample200.dist \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_sample_CMT2
+```
+
+## FBX5
+
+``` bash
+RELATE="/path_to_RELATE/Relate"
+
+bp=18513626
+
+## Relate
+${RELATE}/bin/Relate \
+--mode All \
+--haps chr2_SantoAntao_haploid.haps \
+--sample chr2_SantoAntao_haploid.sample \
+--map chr2_recmap.map \
+--memory 20 --coal SA_relate_popsize.coal -m 2.142e-09 \
+-o  chr2_relate
+
+# SampleBranchLengths (--format a)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr2_relate \
+-o chr2_relate_resample200 \
+-m 2.142e-09 \
+--coal SA_relate_popsize.coal \
+--format a \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+# SampleBranchLengths (CLUES)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr2_relate \
+-o chr2_relate_resample200_CLUES \
+-m 2.142e-09 \
+--coal SA_relate_popsize.coal \
+--format b \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+## TreeViewMutation
+${RELATE}/scripts/TreeView/TreeViewMutation.sh \
+--haps chr2_SantoAntao_haploid.haps \
+--sample chr2_SantoAntao_haploid.sample \
+--anc chr2_relate.anc \
+--mut chr2_relate.mut \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_mutation_FBX5
+
+## TreeViewSample
+${RELATE}/scripts/TreeView/TreeViewSample.sh \
+--haps chr2_SantoAntao_haploid.haps \
+--sample chr2_SantoAntao_haploid.sample \
+--anc chr2_relate_resample200.anc \
+--mut chr2_relate_resample200.mut \
+--dist chr2_relate_resample200.dist \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_sample_FBX5
+```
+
+# Inference of selection coefficient
+
+Install software Clues on GitHub
+<https://github.com/standard-aaron/clues> (see paper
+<https://doi.org/10.1371/journal.pgen.1008384>).
+
+## VIM2
+
+``` bash
+clues_inference="/path_to_clues/clues"
+timeBins="/path_to_timebins/timebins_1epoch.txt"
+
+## Inference of selection and allele frequency trajectory for VIM2 (chr1:24586731)
+python ${clues_inference}/inference.py \
+--times chr1_relate_resample200_CLUES \
+--popFreq 0.468 \
+--tCutoff 5000 \
+--timeBins ${timeBins} \
+--coal SA_relate_popsize.coal \
+--sMax 1 \
+--df 100 \
+--dom 0 \
+--out chr1_VIM2_inference
+```
+
+## CMT2
+
+``` bash
+clues_inference="/path_to_clues/clues"
+timeBins="/path_to_timebins/timebins_1epoch.txt"
+
+## Inference of selection and allele frequency trajectory for CMT2 (Chr4:10707974)
+python ${clues_inference}/inference.py \
+--times chr4_relate_resample200_CLUES \
+--popFreq 0.33 \
+--tCutoff 5000 \
+--timeBins ${timeBins} \
+--coal SA_relate_popsize.coal \
+--sMax 1 \
+--df 100 \
+--dom 0 \
+--out chr4_CMT2_inference
+```
+
+## FBX5
+
+``` bash
+clues_inference="/path_to_clues/clues"
+timeBins="/path_to_timebins/timebins_1epoch.txt"
+
+## Inference of selection and allele frequency trajectory for FBX5 (chr2:18513626)
+python ${clues_inference}/inference.py \
+--times chr2_relate_resample200_CLUES \
+--popFreq 0.33 \
+--tCutoff 5000 \
+--timeBins ${timeBins} \
+--coal SA_relate_popsize.coal \
+--sMax 1 \
+--df 100 \
+--dom 0 \
+--out chr2_FBX5_inference
+```
+
 # Author
 
 - **Johan Zicola** - [johanzi](https://github.com/johanzi)
+- **Emmanuel Tergemina**
+  [EmmanuelTergemina](https://github.com/EmmanuelTergemina)
 
 # License
 

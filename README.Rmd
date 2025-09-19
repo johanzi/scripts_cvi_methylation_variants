@@ -3,9 +3,9 @@ title: "High impact mutations drive DNA methylation variation after colonization
 author: "Johan Zicola"
 date: "`r format(Sys.time())`"
 output:
-  html_notebook:
-    toc: true
   github_document:
+    toc: true
+  html_notebook:
     toc: true
   pdf_document:
     toc: true
@@ -6332,6 +6332,274 @@ grid.arrange(p1, p2, nrow = 1)
 ![](images/permutation_TEs.png)
 
 Observed values (horizontal red lines) are above the permutation distribution.
+
+
+# Marginal genealogical tree with RELATE
+
+Install the RELATE software from https://myersgroup.github.io/relate/ (see paper https://www.nature.com/articles/s41588-019-0484-x).
+
+## VIM2
+
+```{bash, eval=FALSE}
+RELATE="/path_to_RELATE/Relate"
+
+bp=24586731
+
+## Relate
+${RELATE}/bin/Relate \
+--mode All \
+--haps chr1_SantoAntao_haploid.haps \
+--sample chr1_SantoAntao_haploid.sample \
+--map chr1_recmap.map \
+--memory 20 --coal SA_relate_popsize.coal -m 2.2131e-09 \
+-o  chr1_relate
+
+# SampleBranchLengths (--format a)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr1_relate \
+-o chr1_relate_resample200 \
+-m 2.2131e-09 \
+--coal SA_relate_popsize.coal \
+--format a \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+# SampleBranchLengths (CLUES)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr1_relate \
+-o chr1_relate_resample200_CLUES \
+-m 2.2131e-09 \
+--coal SA_relate_popsize.coal \
+--format b \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+## TreeViewMutation
+${RELATE}/scripts/TreeView/TreeViewMutation.sh \
+--haps chr1_SantoAntao_haploid.haps \
+--sample chr1_SantoAntao_haploid.sample \
+--anc chr1_relate.anc \
+--mut chr1_relate.mut \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_mutation_VIM2
+
+## TreeViewSample
+${RELATE}/scripts/TreeView/TreeViewSample.sh \
+--haps chr1_SantoAntao_haploid.haps \
+--sample chr1_SantoAntao_haploid.sample \
+--anc chr1_relate_resample200.anc \
+--mut chr1_relate_resample200.mut \
+--dist chr1_relate_resample200.dist \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_sample_VIM2
+```
+
+## CMT2
+
+```{bash, eval=FALSE}
+RELATE="/path_to_RELATE/Relate"
+
+bp=10707974
+
+## Relate
+${RELATE}/bin/Relate \
+--mode All \
+--haps chr4_SantoAntao_haploid.haps \
+--sample chr4_SantoAntao_haploid.sample \
+--map chr4_recmap.map \
+--memory 20 --coal SA_relate_popsize.coal -m 2.142e-09 \
+-o  chr4_relate
+
+# SampleBranchLengths (--format a)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr4_relate \
+-o chr4_relate_resample200 \
+-m 2.142e-09 \
+--coal SA_relate_popsize.coal \
+--format a \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+# SampleBranchLengths (CLUES)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr4_relate \
+-o chr4_relate_resample200_CLUES \
+-m 2.142e-09 \
+--coal SA_relate_popsize.coal \
+--format b \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+## TreeViewMutation
+${RELATE}/scripts/TreeView/TreeViewMutation.sh \
+--haps chr4_SantoAntao_haploid.haps \
+--sample chr4_SantoAntao_haploid.sample \
+--anc chr4_relate.anc \
+--mut chr4_relate.mut \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_mutation_CMT2
+
+## TreeViewSample
+${RELATE}/scripts/TreeView/TreeViewSample.sh \
+--haps chr4_SantoAntao_haploid.haps \
+--sample chr4_SantoAntao_haploid.sample \
+--anc chr4_relate_resample200.anc \
+--mut chr4_relate_resample200.mut \
+--dist chr4_relate_resample200.dist \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_sample_CMT2
+```
+
+
+## FBX5
+
+```{bash, eval=FALSE}
+RELATE="/path_to_RELATE/Relate"
+
+bp=18513626
+
+## Relate
+${RELATE}/bin/Relate \
+--mode All \
+--haps chr2_SantoAntao_haploid.haps \
+--sample chr2_SantoAntao_haploid.sample \
+--map chr2_recmap.map \
+--memory 20 --coal SA_relate_popsize.coal -m 2.142e-09 \
+-o  chr2_relate
+
+# SampleBranchLengths (--format a)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr2_relate \
+-o chr2_relate_resample200 \
+-m 2.142e-09 \
+--coal SA_relate_popsize.coal \
+--format a \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+# SampleBranchLengths (CLUES)
+${RELATE}/scripts/SampleBranchLengths/SampleBranchLengths.sh \
+-i chr2_relate \
+-o chr2_relate_resample200_CLUES \
+-m 2.142e-09 \
+--coal SA_relate_popsize.coal \
+--format b \
+--num_samples 200 \
+--first_bp ${bp} \
+--last_bp ${bp} \
+--seed 1 
+
+## TreeViewMutation
+${RELATE}/scripts/TreeView/TreeViewMutation.sh \
+--haps chr2_SantoAntao_haploid.haps \
+--sample chr2_SantoAntao_haploid.sample \
+--anc chr2_relate.anc \
+--mut chr2_relate.mut \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_mutation_FBX5
+
+## TreeViewSample
+${RELATE}/scripts/TreeView/TreeViewSample.sh \
+--haps chr2_SantoAntao_haploid.haps \
+--sample chr2_SantoAntao_haploid.sample \
+--anc chr2_relate_resample200.anc \
+--mut chr2_relate_resample200.mut \
+--dist chr2_relate_resample200.dist \
+--poplabels SantoAntao_poplabels.txt \
+--bp_of_interest ${bp} \
+--years_per_gen 1 \
+-o treeview_sample_FBX5
+```
+
+
+
+
+# Inference of selection coefficient 
+
+Install software Clues on GitHub https://github.com/standard-aaron/clues (see paper https://doi.org/10.1371/journal.pgen.1008384).
+
+## VIM2
+
+```{bash, eval=FALSE}
+clues_inference="/path_to_clues/clues"
+timeBins="/path_to_timebins/timebins_1epoch.txt"
+
+## Inference of selection and allele frequency trajectory for VIM2 (chr1:24586731)
+python ${clues_inference}/inference.py \
+--times chr1_relate_resample200_CLUES \
+--popFreq 0.468 \
+--tCutoff 5000 \
+--timeBins ${timeBins} \
+--coal SA_relate_popsize.coal \
+--sMax 1 \
+--df 100 \
+--dom 0 \
+--out chr1_VIM2_inference
+```
+
+
+## CMT2
+
+```{bash, eval=FALSE}
+clues_inference="/path_to_clues/clues"
+timeBins="/path_to_timebins/timebins_1epoch.txt"
+
+## Inference of selection and allele frequency trajectory for CMT2 (Chr4:10707974)
+python ${clues_inference}/inference.py \
+--times chr4_relate_resample200_CLUES \
+--popFreq 0.33 \
+--tCutoff 5000 \
+--timeBins ${timeBins} \
+--coal SA_relate_popsize.coal \
+--sMax 1 \
+--df 100 \
+--dom 0 \
+--out chr4_CMT2_inference
+```
+
+
+## FBX5
+
+```{bash, eval=FALSE}
+clues_inference="/path_to_clues/clues"
+timeBins="/path_to_timebins/timebins_1epoch.txt"
+
+## Inference of selection and allele frequency trajectory for FBX5 (chr2:18513626)
+python ${clues_inference}/inference.py \
+--times chr2_relate_resample200_CLUES \
+--popFreq 0.33 \
+--tCutoff 5000 \
+--timeBins ${timeBins} \
+--coal SA_relate_popsize.coal \
+--sMax 1 \
+--df 100 \
+--dom 0 \
+--out chr2_FBX5_inference
+
+```
+
+
+
 
 
 # Author
