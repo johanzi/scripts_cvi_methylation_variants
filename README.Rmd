@@ -1235,13 +1235,13 @@ cut -f2 data/df_accessions_83.txt | grep -v "seq_ID" | sort > data/df_accessions
 VCF="/srv/biodata/irg/grp_hancock/VCF/superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz"
 
 # Keep the 83 accessions from Santo Antao and keep only chromosomes
-bcftools view -S df_accessions_83_seqID_sorted.txt -r Chr1,Chr2,Chr3,Chr4,Chr5 $VCF > subset_83_only_chr_gatk.vcf
+bcftools view -S df_accessions_83_seqID_sorted.txt -r Chr1,Chr2,Chr3,Chr4,Chr5 $VCF > subset_83_only_chr.vcf
 
 # Remove positions without alternative alleles and non-biallelic SNPs
-bcftools view --min-ac=1 --max-alleles 2  subset_83_only_chr_gatk.vcf > subset_83_only_chr_biallelic_only_alt_gatk.vcf
+bcftools view --min-ac=1 --max-alleles 2  subset_83_only_chr.vcf > subset_83_only_chr_biallelic_only_alt.vcf
 
 # Filter SNP quality with DP>=3, GQ>=25
-vcftools --vcf subset_83_only_chr_biallelic_only_alt_gatk.vcf  \
+vcftools --vcf subset_83_only_chr_biallelic_only_alt.vcf  \
 			--minDP 3 --minGQ 25 --recode --recode-INFO-all \
 			--out subset_83_only_chr_biallelic_only_alt_DP3_GQ25
 
@@ -2262,6 +2262,34 @@ ggplot(SA, aes(long, lat)) +
 ```
 
 ![](images/VIM2_allele_map.png)
+
+Version with jittered plot
+
+
+```{r}
+
+#jitter coordinates 
+b <- runif(nrow(df_vim2_coord), -0.004, 0.004)
+c <- runif(nrow(df_vim2_coord), -0.004, 0.004) ## you may need to adjust the 0.004 in your plot
+
+df_vim2_coord$lat <- df_vim2_coord$lat + b
+df_vim2_coord$long <- df_vim2_coord$long + c
+
+
+ggplot(df_vim2_coord, aes(long, lat)) +
+  geom_map(map = world, aes(map_id = region), fill = NA, color = "black") +
+  coord_quickmap() +
+  xlim(-25.1, -25.01) +
+  ylim(17.09, 17.135) +
+  theme(plot.background = element_rect(fill = "transparent"), panel.background = element_rect(fill = "transparent"), panel.grid.minor = element_blank(), panel.grid.major = element_blank(), axis.line.x = element_line(color = "black", size = 0.5), axis.line.y = element_line(color = "black", size = 0.5)) +
+  xlab("Longitude") +
+  ylab("Latitude") +
+  geom_scatterpie(aes(x = long, y = lat, r = radius, group = population), data = df_vim2_coord, cols = c("freq_derived", "freq_ancestral"), sorted_by_radius = TRUE, alpha = .5) +
+  labs(fill = "VIM2 alleles") +
+  scale_fill_manual(values = c("coral2", "turquoise4")) 
+```
+
+
 
 ## CMT2 distribution
 
@@ -3550,6 +3578,113 @@ BP %>% mutate(Name = fct_reorder(Name, Fold.Enrichment)) %>%  ggplot(aes(x=Fold.
 ```
 
 ![](images/GO_BP_DMRs.png)
+
+
+## Overlap of mCG DMRs with promoter regions
+
+Check if promoter regions are also affected in VIM2del and which are the associated genes. Then define the overlap with DEGs called between VIM2del and VIM2ref.
+
+```{r}
+
+library(rtracklayer)
+library(GenomicRanges)
+
+DMRs_merged_mCG_VIM2 <- read.delim("data/DMRs_merged_mCG_VIM2.txt")
+
+DMR_gr=GRanges(seqnames=DMRs_merged_mCG_VIM2$chrom,
+           ranges=IRanges(DMRs_merged_mCG_VIM2$start,
+                          end=DMRs_merged_mCG_VIM2$end),
+                          score=DMRs_merged_mCG_VIM2$score)
+
+path_bed <- "data/bed_files/"
+
+# Path to bed files for region analysis
+bed_genes <- paste(path_bed, "Arabidopsis_thaliana.TAIR10.39.bed", sep = "")
+
+# Get gene list and coordinate in bed format
+coordinate_genes <- valr::read_bed(bed_genes)
+
+# Convert to GRange
+coordinate_genes_gr <- rtracklayer::import(bed_genes)
+
+# Get 500 bp promoter
+coordinate_500bp_promoter_gr <- GenomicRanges::flank(coordinate_genes_gr, width=500, start=TRUE)
+
+overlap_mCG_DMR_gene_analysis_VIM2 <- valr::bed_intersect(DMR_gr, coordinate_500bp_promoter_gr, suffix=c("_DMRs","_genes"))
+
+# Find DMR that overlap at least 400
+overlap_DMR_promoters <- IRanges::subsetByOverlaps(coordinate_500bp_promoter_gr, DMR_gr, minoverlap=500)
+
+# Check if overlap with VIM2 DEGs
+
+significant_94_DEGs_VIM2 <- read.delim("data/significant_94_DEGs_VIM2.txt")
+
+# Get gene ID without transcript suffix and put all in uppercase
+gene_DMR_promoter <- overlap_DMR_promoters$name
+gene_DMR_promoter <- gsub("\\..*","", gene_DMR_promoter)
+gene_DMR_promoter <- toupper(gene_DMR_promoter)
+
+intersect(gene_DMR_promoter, significant_94_DEGs_VIM2$geneID)
+# 3 out of 94
+
+```
+
+- AT2G10608
+- AT5G03090
+- AT5G01055
+
+AT2G10608 and AT5G03090 are protein-coding genes while AT5G01055 encodes a long non-coding RNA.
+
+Check all genes with DMRs and the odds to overlap with 3 of the 94 DEGs.
+
+```{r}
+
+genes_with_DMRs <- read.delim("data/list_DMR_genes_VIM2.txt", header=F)
+
+# Number of genes with DMRs = 751
+# Number of genes with DMRs in their promoter = 101
+# Number of DEGs = 94
+# Number of genes in the overlap = 3
+# Number of genes used for DEG analysis = 37686
+
+# Using number of genes as universe
+library(GeneOverlap)
+overlap <- newGeneOverlap(gene_DMR_promoter,significant_94_DEGs_VIM2$geneID, genome.size=37686)
+testGeneOverlap(overlap )
+
+```
+
+```
+GeneOverlap object:
+listA size=101
+listB size=94
+Intersection size=3
+Overlapping p-value=2.1e-03
+Jaccard Index=0.0
+```
+
+p-value = 0.2%
+
+```{r}
+
+# Using number of DMRs as universe
+library(GeneOverlap)
+overlap <- newGeneOverlap(gene_DMR_promoter,significant_94_DEGs_VIM2$geneID, genome.size=12996)
+testGeneOverlap(overlap )
+```
+
+```
+GeneOverlap object:
+listA size=101
+listB size=94
+Intersection size=3
+Overlapping p-value=0.037
+Jaccard Index=0.0
+```
+
+p-value = 3.7%
+
+The intersect is significant.
 
 # Analysis DNA methylation in vim mutants
 
