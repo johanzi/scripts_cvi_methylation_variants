@@ -2263,34 +2263,6 @@ ggplot(SA, aes(long, lat)) +
 
 ![](images/VIM2_allele_map.png)
 
-Version with jittered plot
-
-
-```{r}
-
-#jitter coordinates 
-b <- runif(nrow(df_vim2_coord), -0.004, 0.004)
-c <- runif(nrow(df_vim2_coord), -0.004, 0.004) ## you may need to adjust the 0.004 in your plot
-
-df_vim2_coord$lat <- df_vim2_coord$lat + b
-df_vim2_coord$long <- df_vim2_coord$long + c
-
-
-ggplot(df_vim2_coord, aes(long, lat)) +
-  geom_map(map = world, aes(map_id = region), fill = NA, color = "black") +
-  coord_quickmap() +
-  xlim(-25.1, -25.01) +
-  ylim(17.09, 17.135) +
-  theme(plot.background = element_rect(fill = "transparent"), panel.background = element_rect(fill = "transparent"), panel.grid.minor = element_blank(), panel.grid.major = element_blank(), axis.line.x = element_line(color = "black", size = 0.5), axis.line.y = element_line(color = "black", size = 0.5)) +
-  xlab("Longitude") +
-  ylab("Latitude") +
-  geom_scatterpie(aes(x = long, y = lat, r = radius, group = population), data = df_vim2_coord, cols = c("freq_derived", "freq_ancestral"), sorted_by_radius = TRUE, alpha = .5) +
-  labs(fill = "VIM2 alleles") +
-  scale_fill_manual(values = c("coral2", "turquoise4")) 
-```
-
-
-
 ## CMT2 distribution
 
 ```{r}
@@ -2468,7 +2440,7 @@ ggplot_per_context <- function(df, context, group){
   }
   
   df_context <- df[(df$context == context),]
-
+  
   ggplot(data=df_context, aes_string(x=group, y="percent_methylation", group=group))+
     ggtitle(paste(context, " methylation", sep="")) + theme_bw()+
     theme(plot.title = element_text(hjust = 0.5)) + 
@@ -6467,6 +6439,755 @@ grid.arrange(p1, p2, nrow = 1)
 ![](images/permutation_TEs.png)
 
 Observed values (horizontal red lines) are above the permutation distribution.
+
+
+# Analysis of presence/absence variation of TEs
+
+Going through the literature, several methods are used to look for TE presence/absence variation (PAV) based on paired-end sequencing. The two most recent methods I found are TE-Tracker [Gilly et al 2014](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-014-0377-z) and TEPID [Stuart et al 2016](https://elifesciences.org/articles/20777). It seems the documentation is more complete for TEPID and the method was used in a recent paper on *Capsella rubella* ([Niu et al 2019](https://doi.org/10.1073/pnas.1811498116)). 
+
+## Installation TEPID
+
+I fixed some bugs in the TEPID but not all my changes we integrated in the original github repository (https://github.com/ListerLab/TEPID). I recommend therefore to download the version I forked on my GitHub account (https://github.com/johanzi/TEPID).
+
+Get started: 
+
+```{bash, eval=FALSE}
+# Check doc on github: https://github.com/ListerLab/TEPID
+
+cd ~/SCRIPTS
+git clone git@github.com:johanzi/TEPID.git
+
+cd ./TEPID
+pip install -r requirements.txt --user
+
+# Problem with installing pysam, rerun from build-server => seems to work
+python setup.py install --user
+
+```
+
+Seems to work. I need to install Yaha
+
+```{bash, eval=FALSE}
+git clone https://github.com/GregoryFaust/yaha.git
+
+cd yaha
+
+make # not working
+# Check solution on https://github.com/GregoryFaust/yaha/issues/2
+# Edit Makefile file and change CPPFLAGS := $(CCFLAGS) into
+# CPPFLAGS := $(CCFLAGS) -fpermissive
+
+make # Working
+# Add /home/zicola/SCRIPTS/yaha/bin to $PATH 
+
+```
+
+Create Yaha index. They don't give parameters for indexing https://elifesciences.org/articles/20777 so I use the default ones: -H (max-Hits) 65525, -L (seed-Length) 15, -S (Skip-distance) 1
+
+```{bash, eval=FALSE}
+cd /home/zicola/TAIR10_Chr_no_Pt_Mt
+
+mkdir yaha_index
+
+cd yaha_index
+
+yaha -g TAIR10.fa
+
+YAHA version 0.1.83
+Compressing TAIR10.fa into TAIR10.nib2.
+Finished compressing TAIR10.nib2, now forming index.
+Creating index file TAIR10.X15_01_65525S.
+Randomly Sampling hits for 15-mers that occur more than 65525 times in the refer                                                          ence.
+0 15-mers had more than 65525 hits.
+Index TAIR10.X15_01_65525S created.
+Operation on TAIR10.nib2 used 1M22S(82.368S) User, 22.060S System, Total: 1M44S(104.428S) in 2M28S(148S) wall time.
+
+# Created 2 files in parent directory. Move them back to yaha_index/
+TAIR10.nib2
+TAIR10.X15_01_65525S
+
+```
+
+Create bowtie2 index
+
+```{bash, eval=FALSE}
+cd /home/zicola/TAIR10_Chr_no_Pt_Mt
+
+bowtie2-build -f TAIR10.fa TAIR10_bowtie2
+
+# Move created file in bowtie2_index/
+
+```
+
+I now have bowtie2 and yaha indexes to run TEPID pipeline
+
+
+## TE annotation used
+
+The TAIR9 TE annotation (provided by TEPID in `TEPID/Annotation/Arabidopsis/TAIR9_TE.bed.gz`) seems similar to Araport11 (same number of features, positions of ATCOPIA24 similar).
+
+Make sure the chromosome name in the TE bed file and the genome fasta files are the same (for instance chr or Chr). If needed changed bed file to fit the fasta file chromosome name system
+
+```{bash, eval=FALSE}
+cd TEPID/Annotation/Arabidopsis/
+
+gunzip TAIR9_TE.bed.gz
+
+# Put C in uppercase to match TAIR10 fasta file 
+sed -i 's/chr/Chr/g' TAIR9_TE.bed 
+```
+
+
+Check insert size of the paired-end reads (use Python script getinsertsize.py available in gist https://gist.github.com/davidliwei/2323462)
+
+
+```{bash, eval=FALSE}
+
+# Get python script getinsertsize.py
+cd ~/SCRIPTS
+
+wget https://gist.githubusercontent.com/davidliwei/2323462/raw/66a91787bd76a7ca0eee31aab20284295b0fb46b/getinsertsize.py
+
+# Go to mapped reads
+cd /srv/netscratch/dep_coupland/grp_hancock/mappedBAM/CVI
+
+samtools view 2876_AL_S1-1.sorted.bam | head -n 10000 |  python ~/SCRIPTS/getinsertsize.py -
+
+Read length: mean 150.927854454, STD=1.71195688463
+Read span: mean 343.815380698, STD=89.0161271871
+
+```
+
+The average insert size in this bam file is 343 bp.
+
+## Run TEPID
+
+Create a wrap up bash script `run_tepid.sh` that takes as input unmapped bam files containing both read1 and read2:
+
+```{bash, eval=FALSE}
+
+run_tepid(){
+
+  # Path to Yaha index
+  yaha_index="/home/zicola/TAIR10_Chr_no_Pt_Mt/yaha_index/TAIR10.X15_01_65525S"
+  
+  # Bowtie2 index path needs to include the prefix of the index
+  bowtie2_index="/home/zicola/TAIR10_Chr_no_Pt_Mt/bowtie2_index/TAIR10_bowtie2"
+  
+  # TE index
+  TE_bed="/srv/netscratch/dep_coupland/grp_hancock/johan/tepid_pipeline/TAIR9_TE.bed"
+  
+  # Bam file to convert into fastq files
+  i=$1
+  
+  # Check if all variables exists
+  if [ ! -e $yaha_index ]; then
+    echo "File $yaha_index does not exist"
+    exit 1
+  elif [ ! -e ${bowtie2_index}.1.bt2 ]; then
+    echo "File ${bowtie2_index}.1.bt2 does not exist. Bowtie2 indexes not properly created."
+    exit 1
+  elif [ ! -e $TE_bed ]; then
+    echo "File $TE_bed does not exist"
+    exit 1
+  elif [ ! -d $bam_path ]; then
+    echo "Directory $TE_bed does not exist"
+    exit 1
+  fi
+
+  echo -e "\n#################CONVERSION BAM TO FASTQ####################\n"
+
+  echo -e $i 'is processed\n'
+
+  start=$(date +%s)
+
+  # Create fastq files 1 and 2
+  name=$(basename $i | cut -d'_' -f1)
+
+  # Skip the sample 12851 (already done)
+  if [ $name == "12851" ]; then
+    continue
+  fi
+
+  echo -e "samtools sort -n $i | bedtools bamtofastq -i - -fq ${name}.end1.fq -fq2 ${name}.end2.fq\n"
+  samtools sort -n $i | bedtools bamtofastq -i - -fq ${name}.end1.fq -fq2 ${name}.end2.fq
+
+  # Check if the 2 fastq files were generated properly before continuing
+  if [ ! -e ${name}.end1.fq ] || [ ! -e ${name}.end2.fq ]; then
+    echo "File ${name}.end1.fq and/or ${name}.end2.fq do not exist"
+    exit 1
+  fi
+
+  # Perform tepid-map step
+  echo -e "\n#################TEPID-MAP####################\n"
+
+  echo -e "~/SCRIPTS/TEPID/build/scripts-2.7/tepid-map -x $bowtie2_index -y $yaha_index -p 6 -s 200 -n ${name} -1 ${name}.end1.fq -2 ${name}.end2.fq\n"
+  ~/SCRIPTS/TEPID/build/scripts-2.7/tepid-map -x $bowtie2_index -y $yaha_index -p 6 -s 200  -n ${name} -1 ${name}.end1.fq -2 ${name}.end2.fq
+
+  # Check if bam and split.bam files were created
+  if [ ! -e ${name}.bam ]; then
+    echo "File ${name}.bam does not exist"
+    exit 1
+  elif [ ! -e ${name}.split.bam ]; then
+    echo "File ${name}.split.bam does not exist"
+    exit 1
+  fi
+
+  # Get rid of umap.fastq which is not removed by tepid-map. Not needed afterward
+  echo -e "rm ${name}.umap.fastq\n"
+  rm ${name}.umap.fastq
+
+  # Perform tepid-discover step
+  echo -e "\n#################TEPID-DISCOVER####################\n"
+  
+  echo -e "~/SCRIPTS/TEPID/build/scripts-2.7/tepid-discover --name $name --te $TE_bed --keep --conc ${name}.bam --split ${name}.split.bam\n"
+  ~/SCRIPTS/TEPID/build/scripts-2.7/tepid-discover --name $name --te $TE_bed --conc ${name}.bam --split ${name}.split.bam
+
+  # Remove fastq files
+  echo -e "rm ${name}.end1.fq ${name}.end2.fq"
+  rm ${name}.end1.fq ${name}.end2.fq
+
+  # Remove bam files
+  echo -e "rm ${name}.split.bam ${name}.bam ${name}.bam.bai"
+  rm ${name}.split.bam ${name}.bam ${name}.bam.bai
+
+  end=$(date +%s)
+  runtime=$((end-start))
+
+  echo -e "Sample $name processed. Run time: $runtime \n"
+
+  echo -e "\n######################END########################\n"
+}
+
+"$@"
+
+```
+
+Launch the pipeline for all CVI. Here I use the job manager LSF. Adapt script to your HPC manager if different (e.g. SLURM). I allocated 20 CPUs and 12Gb of RAM per job.
+
+```{bash, eval=FALSE}
+bam_path="/srv/biodata/dep_coupland/grp_hancock/rawData/CVI"
+
+for i in ${bam_path}/*bam; do
+    bsub -q multicore20 -n 20 -R "span[hosts=1] rusage[mem=10000]" -M 12000 "run_tepid.sh run_tepid $i"
+done
+```
+
+Each run generates 5 files: 
+
+```
+\ls -1 *15673*
+../deletion_reads_15673.txt
+../deletions_15673.bed
+../insertion_reads_15673.txt
+../insertions_15673.bed
+../tepid_discover_log_15673.txt
+```
+
+## Summarize TEPID output
+
+```{bash, eval=FALSE}
+
+cd /srv/netscratch/irg/grp_hancock/johan/tepid_pipeline/CPV_fastq/all_CPV
+
+echo -e "seqID\tnb_deletions\tnb_insertions" >> summary_indel.txt
+
+for i in tepid_discover_log_*txt; do
+  seqID=$(echo $i | cut -d'_' -f4- | cut -d'.' -f1)
+	nb_insertions=$(wc -l insertions_${seqID}.bed | cut -d' ' -f1 -)
+	nb_deletions=$(wc -l deletions_${seqID}.bed | cut -d' ' -f1 -)  
+	echo -e "${seqID}\t${nb_deletions}\t${nb_insertions}"
+done >> summary_indel.txt
+
+for i in tepid_discover_log_*txt; do
+  seqID=$(echo $i | cut -d'_' -f4- | cut -d'.' -f1)
+	coverage=$(sed -n 5p $i | cut -d' ' -f3)
+	insert_size=$(sed -n 4p $i | cut -d' ' -f5)
+	sd_insert_size=$(sed -n 4p $i | cut -d' ' -f10)
+	read_length=$(sed -n 6p $i | cut -d' ' -f4)
+	echo -e "${seqID}\t${insert_size}\t${sd_insert_size}\t${coverage}\t${read_length}"
+done >> summary_tepid_stats.txt
+
+# Keep only SA which are in the clean set (190 accessions)
+grep -w -f list_190_seqid.txt summary_indel.txt > summary_indel_clean.txt
+grep -w -f list_190_seqid.txt summary_tepid_stats.txt > summary_tepid_stats_clean.txt
+
+paste summary_tepid_stats_clean.txt summary_indel_clean.txt | cut -f1,2,3,4,5,7,8 > TE_indel_TEPID.txt
+
+# Add headers
+sed -i '1 i\seqID\tinsert_size\tsd_insert_size\tcoverage\tread_length\tnb_deletions\tnb_insertions' TE_indel_TEPID.txt
+
+```
+
+
+Extract values for long TEs only:
+
+```{bash, eval=FALSE}
+
+bed_TEs_4kb="data/bed_files/Araport11_GFF3_transposons_longer_4kb.bed"
+
+wc -l $bed_TEs_4kb
+1235 Araport11_GFF3_transposons_longer_4kb.bed
+
+cd /srv/netscratch/irg/grp_hancock/johan/tepid_pipeline/CPV_fastq/all_CPV/long_TEs
+
+# Names of long TEs
+cut -f4 $bed_TEs_4kb > TE_ID_long_TEs.txt
+
+# Now get for each accessions the ins/del related to these TEs
+for i in ../insertion*bed; do
+  grep -f TE_ID_long_TEs.txt $i > ${i%.*}_long_TEs.txt
+done
+
+for i in ../deletion*bed; do
+  grep -f TE_ID_long_TEs.txt $i > ${i%.*}_long_TEs.txt
+done
+
+# Summarize values
+for i in deletions*; do
+  seqID=$(echo "$i" |  sed 's/deletions_//' | sed 's/_long_TEs.txt//')
+  count_deletion=$(wc -l $i  | cut -d' ' -f1)
+  count_insertion=$(wc -l deletions_${name}_long_TEs.txt  | cut -d' ' -f1)
+  printf "$name\t$count_deletion\t$count_insertion\n" >> TE_indel_TEPID_long_TEs.txt
+done
+
+sed -i '1 i\seqID\tnb_deletions\tnb_insertions' TE_indel_TEPID_long_TEs.txt
+
+paste TE_indel_TEPID.txt TE_indel_TEPID_long_TEs.txt > TE_indel_TEPID_all.txt
+
+mv TE_indel_TEPID_all.txt TE_indel_TEPID.txt
+
+```
+
+Import this file in Excel and merge with the genotyping call for VIM2, CMT2, and FBX5 (supplementary table X) also put in text file `data/TE_indel_TEPID.txt`.
+
+```{r}
+
+df_TE_SA <- read.delim("data/TE_indel_TEPID.txt")
+
+factors <- names(df_TE_SA)[c(1,2,3,8,9,10)]
+df_TE_SA <-  df_TE_SA %>% mutate_at(factors, as.factor)
+
+# Functions to plot number of TE insertions and deletions
+TE_plot_per_allele <- function(df, type, group){
+  
+  require(ggplot2)
+  require(tidyr)
+  
+  # Remove potential rows with NA for genotype (one case for FBX5)
+  df_clean <- df %>% drop_na(group)
+  
+  give.n <- function(x){
+    return(c(y = mean(x), label = length(x)))
+  }
+  
+  ggplot(data=df_clean, aes_string(x=group, y=type, group=group))+
+    geom_boxplot(outlier.shape = NA) +
+    geom_jitter() +
+    ggtitle(paste(type," for ",group, sep="")) + 
+    theme_bw() +
+    stat_summary(fun.data = give.n, geom = "text") +
+    theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black")) + 
+      theme(plot.title = element_text(hjust = 0.5)) + 
+      scale_y_continuous(labels = scales::comma_format())
+}
+
+```
+
+## Analysis all TEs
+
+### CMT2
+
+#### Deletions
+
+```{r}
+TE_plot_per_allele(df_TE_SA, "TE_deletions","CMT2")
+```
+
+
+![](images/TE_deletions_CMT2.png)
+
+
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(TE_deletions~CMT2, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(TE_deletions~CMT2, df_TE_SA)
+
+wilcox.test(df_TE_SA$TE_deletions[df_TE_SA$CMT2==0], df_TE_SA$TE_deletions[df_TE_SA$CMT2==1], alternative = "two.sided")
+
+```
+
+```
+Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.95634, p-value = 1.347e-05
+
+
+	Bartlett test of homogeneity of variances
+
+data:  TE_deletions by CMT2
+Bartlett's K-squared = 9.9726, df = 1, p-value = 0.001589
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$TE_deletions[df_TE_SA$CMT2 == 0] and df_TE_SA$TE_deletions[df_TE_SA$CMT2 == 1]
+W = 4176, p-value = 0.4343
+alternative hypothesis: true location shift is not equal to 0
+```
+
+No significant differences
+
+#### Insertions
+
+```{r}
+TE_plot_per_allele(df_TE_SA, "TE_insertions","CMT2")
+```
+
+
+![](images/TE_insertions_CMT2.png)
+
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(TE_insertions~CMT2, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(TE_insertions~CMT2, df_TE_SA)
+
+wilcox.test(df_TE_SA$TE_insertions[df_TE_SA$CMT2==0], df_TE_SA$TE_insertions[df_TE_SA$CMT2==1], alternative = "two.sided")
+
+```
+
+```
+Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.93135, p-value = 8.173e-08
+
+
+	Bartlett test of homogeneity of variances
+
+data:  TE_insertions by CMT2
+Bartlett's K-squared = 3.8974, df = 1, p-value = 0.04836
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$TE_insertions[df_TE_SA$CMT2 == 0] and df_TE_SA$TE_insertions[df_TE_SA$CMT2 == 1]
+W = 3670, p-value = 0.5148
+alternative hypothesis: true location shift is not equal to 0
+```
+
+
+### FBX5
+
+#### Deletions
+
+```{r}
+TE_plot_per_allele(df_TE_SA, "TE_deletions","FBX5")
+```
+
+
+![](images/TE_deletions_FBX5.png)
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(TE_deletions~FBX5, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(TE_deletions~FBX5, df_TE_SA)
+
+wilcox.test(df_TE_SA$TE_deletions[df_TE_SA$FBX5==0], df_TE_SA$TE_deletions[df_TE_SA$FBX5==1], alternative = "two.sided")
+
+```
+
+```
+Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.94745, p-value = 1.999e-06
+
+
+	Bartlett test of homogeneity of variances
+
+data:  TE_deletions by FBX5
+Bartlett's K-squared = 0.3445, df = 1, p-value = 0.5572
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$TE_deletions[df_TE_SA$FBX5 == 0] and df_TE_SA$TE_deletions[df_TE_SA$FBX5 == 1]
+W = 3176.5, p-value = 0.03136
+alternative hypothesis: true location shift is not equal to 0
+
+```
+
+Significant difference (p-value = 3%)
+
+
+#### Insertions
+
+```{r}
+TE_plot_per_allele(df_TE_SA, "TE_insertions","FBX5")
+```
+
+![](images/TE_insertions_FBX5.png)
+
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(TE_insertions~FBX5, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(TE_insertions~FBX5, df_TE_SA)
+
+wilcox.test(df_TE_SA$TE_insertions[df_TE_SA$FBX5==0], df_TE_SA$TE_insertions[df_TE_SA$FBX5==1], alternative = "two.sided")
+
+```
+
+```
+	Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.93701, p-value = 2.49e-07
+
+
+	Bartlett test of homogeneity of variances
+
+data:  TE_insertions by FBX5
+Bartlett's K-squared = 1.5862, df = 1, p-value = 0.2079
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$TE_insertions[df_TE_SA$FBX5 == 0] and df_TE_SA$TE_insertions[df_TE_SA$FBX5 == 1]
+W = 2823.5, p-value = 0.00162
+alternative hypothesis: true location shift is not equal to 0
+```
+
+Significant difference (p-value = 0.16%)
+
+
+
+## Analysis long TEs
+
+Focus only on long TEs (>4 kb)
+
+### CMT2
+
+#### Deletions
+
+```{r}
+TE_plot_per_allele(df_TE_SA, "long_TE_deletions","CMT2")
+```
+
+
+![](images/long_TE_deletions_CMT2.png)
+
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(long_TE_deletions~CMT2, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(long_TE_deletions~CMT2, df_TE_SA)
+
+wilcox.test(df_TE_SA$long_TE_deletions[df_TE_SA$CMT2==0], df_TE_SA$long_TE_deletions[df_TE_SA$CMT2==1], alternative = "two.sided")
+
+```
+
+```
+Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.93414, p-value = 1.363e-07
+
+
+	Bartlett test of homogeneity of variances
+
+data:  long_TE_deletions by CMT2
+Bartlett's K-squared = 1.4703, df = 1, p-value = 0.2253
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$long_TE_deletions[df_TE_SA$CMT2 == 0] and df_TE_SA$long_TE_deletions[df_TE_SA$CMT2 == 1]
+W = 4078.5, p-value = 0.6132
+alternative hypothesis: true location shift is not equal to 0
+```
+
+No significant differences
+
+#### Insertions
+
+```{r}
+TE_plot_per_allele(df_TE_SA, "long_TE_insertions","CMT2")
+```
+
+
+![](images/long_TE_insertions_CMT2.png)
+
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(long_TE_insertions~CMT2, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(long_TE_insertions~CMT2, df_TE_SA)
+
+wilcox.test(df_TE_SA$long_TE_insertions[df_TE_SA$CMT2==0], df_TE_SA$long_TE_insertions[df_TE_SA$CMT2==1], alternative = "two.sided")
+
+```
+
+```
+Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.95178, p-value = 4.798e-06
+
+
+	Bartlett test of homogeneity of variances
+
+data:  long_TE_insertions by CMT2
+Bartlett's K-squared = 0.50535, df = 1, p-value = 0.4772
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$long_TE_insertions[df_TE_SA$CMT2 == 0] and df_TE_SA$long_TE_insertions[df_TE_SA$CMT2 == 1]
+W = 3389, p-value = 0.1473
+alternative hypothesis: true location shift is not equal to 0
+```
+
+No significant differences.
+
+### FBX5
+
+#### Deletions
+
+```{r}
+TE_plot_per_allele(df_TE_SA, "long_TE_deletions","FBX5")
+```
+
+![](images/long_TE_deletions_FBX5.png)
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(long_TE_deletions~FBX5, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(long_TE_deletions~FBX5, df_TE_SA)
+
+wilcox.test(df_TE_SA$long_TE_deletions[df_TE_SA$FBX5==0], df_TE_SA$long_TE_deletions[df_TE_SA$FBX5==1], alternative = "two.sided")
+
+```
+
+```
+
+	Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.94569, p-value = 1.385e-06
+
+
+	Bartlett test of homogeneity of variances
+
+data:  long_TE_deletions by FBX5
+Bartlett's K-squared = 0.049754, df = 1, p-value = 0.8235
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$long_TE_deletions[df_TE_SA$FBX5 == 0] and df_TE_SA$long_TE_deletions[df_TE_SA$FBX5 == 1]
+W = 2871.5, p-value = 0.002546
+alternative hypothesis: true location shift is not equal to 0
+
+```
+
+Significant difference (p-value = 0.25%).
+
+
+#### Insertions
+
+```{r}
+TE_plot_per_allele(df_TE_SA, "long_TE_insertions","FBX5")
+```
+
+![](images/long_TE_insertions_FBX5.png)
+
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(long_TE_insertions~FBX5, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(long_TE_insertions~FBX5, df_TE_SA)
+
+wilcox.test(df_TE_SA$long_TE_insertions[df_TE_SA$FBX5==0], df_TE_SA$long_TE_insertions[df_TE_SA$FBX5==1], alternative = "two.sided")
+
+```
+
+```
+Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.96014, p-value = 3.481e-05
+
+
+	Bartlett test of homogeneity of variances
+
+data:  long_TE_insertions by FBX5
+Bartlett's K-squared = 0.23678, df = 1, p-value = 0.6265
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$long_TE_insertions[df_TE_SA$FBX5 == 0] and df_TE_SA$long_TE_insertions[df_TE_SA$FBX5 == 1]
+W = 3074.5, p-value = 0.01462
+alternative hypothesis: true location shift is not equal to 0
+
+```
+
+Significant difference (p-value = 1.4%).
 
 
 # Marginal genealogical tree with RELATE
