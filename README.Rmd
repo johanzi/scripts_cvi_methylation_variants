@@ -6800,6 +6800,54 @@ TE_plot_per_allele <- function(df, type, group){
 
 ### CMT2
 
+#### Transpositions
+
+```{r}
+
+df_TE_SA$TE_transpositions <- df_TE_SA$TE_deletions + df_TE_SA$TE_insertions
+
+TE_plot_per_allele(df_TE_SA, "TE_transpositions","CMT2")
+
+```
+
+![](images/TE_transpositions_CMT2.png)
+
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(TE_transpositions~CMT2, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(TE_transpositions~CMT2, df_TE_SA)
+
+wilcox.test(df_TE_SA$TE_transpositions[df_TE_SA$CMT2==0], df_TE_SA$TE_transpositions[df_TE_SA$CMT2==1], alternative = "two.sided")
+
+```
+
+```
+	Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.96969, p-value = 0.0003891
+
+
+	Bartlett test of homogeneity of variances
+
+data:  TE_transpositions by CMT2
+Bartlett's K-squared = 4.3466, df = 1, p-value = 0.03708
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$TE_transpositions[df_TE_SA$CMT2 == 0] and df_TE_SA$TE_transpositions[df_TE_SA$CMT2 == 1]
+W = 4036, p-value = 0.7006
+alternative hypothesis: true location shift is not equal to 0
+```
+
 #### Deletions
 
 ```{r}
@@ -6893,8 +6941,55 @@ W = 3670, p-value = 0.5148
 alternative hypothesis: true location shift is not equal to 0
 ```
 
-
 ### FBX5
+
+#### Transpositions
+
+```{r}
+
+df_TE_SA$TE_transpositions <- df_TE_SA$TE_deletions + df_TE_SA$TE_insertions
+
+TE_plot_per_allele(df_TE_SA, "TE_transpositions","FBX5")
+
+```
+
+![](images/TE_transpositions_FBX5.png)
+
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(TE_transpositions~FBX5, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(TE_transpositions~FBX5, df_TE_SA)
+
+wilcox.test(df_TE_SA$TE_transpositions[df_TE_SA$FBX5==0], df_TE_SA$TE_transpositions[df_TE_SA$FBX5==1], alternative = "two.sided")
+
+```
+
+```
+	Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.97846, p-value = 0.005159
+
+
+	Bartlett test of homogeneity of variances
+
+data:  TE_transpositions by FBX5
+Bartlett's K-squared = 0.57868, df = 1, p-value = 0.4468
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$TE_transpositions[df_TE_SA$FBX5 == 0] and df_TE_SA$TE_transpositions[df_TE_SA$FBX5 == 1]
+W = 3001.5, p-value = 0.008095
+alternative hypothesis: true location shift is not equal to 0
+```
 
 #### Deletions
 
@@ -6998,6 +7093,54 @@ Focus only on long TEs (>4 kb)
 
 ### CMT2
 
+#### Transpositions
+
+```{r}
+
+df_TE_SA$long_TE_transpositions <- df_TE_SA$long_TE_deletions + df_TE_SA$long_TE_insertions
+
+TE_plot_per_allele(df_TE_SA, "long_TE_transpositions","CMT2")
+
+```
+
+![](images/long_TE_transpositions_CMT2.png)
+
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(long_TE_transpositions~CMT2, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(long_TE_transpositions~CMT2, df_TE_SA)
+
+wilcox.test(df_TE_SA$long_TE_transpositions[df_TE_SA$CMT2==0], df_TE_SA$long_TE_transpositions[df_TE_SA$CMT2==1], alternative = "two.sided")
+
+```
+
+```
+	Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.98509, p-value = 0.04162
+
+
+	Bartlett test of homogeneity of variances
+
+data:  long_TE_transpositions by CMT2
+Bartlett's K-squared = 0.19622, df = 1, p-value = 0.6578
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$long_TE_transpositions[df_TE_SA$CMT2 == 0] and df_TE_SA$long_TE_transpositions[df_TE_SA$CMT2 == 1]
+W = 3589.5, p-value = 0.3789
+alternative hypothesis: true location shift is not equal to 0
+```
+
 #### Deletions
 
 ```{r}
@@ -7093,6 +7236,54 @@ alternative hypothesis: true location shift is not equal to 0
 No significant differences.
 
 ### FBX5
+
+#### Transpositions
+
+```{r}
+
+df_TE_SA$long_TE_transpositions <- df_TE_SA$long_TE_deletions + df_TE_SA$long_TE_insertions
+
+TE_plot_per_allele(df_TE_SA, "long_TE_transpositions","FBX5")
+
+```
+
+![](images/long_TE_transpositions_FBX5.png)
+
+```{r}
+# Libraries for Welch test
+require(onewaytests)
+
+# Normality
+lm <- aov(long_TE_transpositions~FBX5, data=df_TE_SA)
+lm.stdres <- rstandard(lm)
+shapiro.test(lm.stdres)
+
+# Homoscedasticity
+bartlett.test(long_TE_transpositions~FBX5, df_TE_SA)
+
+wilcox.test(df_TE_SA$long_TE_transpositions[df_TE_SA$FBX5==0], df_TE_SA$long_TE_transpositions[df_TE_SA$FBX5==1], alternative = "two.sided")
+
+```
+
+```
+	Shapiro-Wilk normality test
+
+data:  lm.stdres
+W = 0.9862, p-value = 0.06131
+
+
+	Bartlett test of homogeneity of variances
+
+data:  long_TE_transpositions by FBX5
+Bartlett's K-squared = 0.014213, df = 1, p-value = 0.9051
+
+
+	Wilcoxon rank sum test with continuity correction
+
+data:  df_TE_SA$long_TE_transpositions[df_TE_SA$FBX5 == 0] and df_TE_SA$long_TE_transpositions[df_TE_SA$FBX5 == 1]
+W = 2868, p-value = 0.002475
+alternative hypothesis: true location shift is not equal to 0
+```
 
 #### Deletions
 
