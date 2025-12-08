@@ -2227,6 +2227,15 @@ df_coordinates <- read.table("data/coord_populations_SA.txt", header=TRUE)
 names(df_coordinates) <- c("population","long","lat")
 ```
 
+
+```{r}
+# Take coordinates from Supp Table 1 from Fulgione 2022
+# Remove duplicates by pop and keep one of the two S24 coordinates
+
+df_coordinates <- read.table("data/coord_populations_SA.txt", header=TRUE)
+names(df_coordinates) <- c("population","long","lat")
+```
+
 ## VIM2 distribution
 
 ```{r}
@@ -2289,7 +2298,7 @@ ggplot(SA, aes(long, lat)) +
   ylab("Latitude") +
   geom_scatterpie(aes(x = long, y = lat, r = radius, group = population), data = df_cmt2_coord, cols = c("freq_derived","freq_ancestral"), sorted_by_radius = TRUE, alpha = .5) +
   labs(fill = "CMT2 alleles") +
-  scale_fill_manual(values = c("turquoise4", "coral2")) +
+  scale_fill_manual(values = c("coral2","turquoise4")) +
   theme(axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16)) +
   geom_scatterpie_legend(df_cmt2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005)
 
@@ -2409,7 +2418,80 @@ ggplot(data = df, aes(population_nb, freq_derived)) +
 
 ![](images/FBX5_deletion_frequency.png)
 
+## Plot diagram all alleles
 
+```{r}
+############# VIM2
+
+# Create new variable which concatenat population name and number of accessions
+df_vim2_coord$population_nb <- paste(df_vim2_coord$population, " n=", df_vim2_coord$total, sep="")
+
+# Remove Cvi
+df_vim2 <- df_vim2_coord[!(df_vim2_coord$population=="Cvi"),]
+
+# Order accession by longitude
+df_vim2$population <- factor(df_vim2$population, levels = df_vim2$population[order(df_vim2$long)])
+df_vim2$population_nb <- factor(df_vim2$population_nb, levels = df_vim2$population_nb[order(df_vim2$long)])
+
+df_vim2$allele <- as.factor("VIM2")
+
+############# CMT2
+
+# Remove Cvi
+df_cmt2 <- df_cmt2_coord[!(df_cmt2_coord$population=="Cvi"),]
+
+# Order accession by longitude
+df_cmt2$population <- factor(df_cmt2$population, levels = df_cmt2$population[order(df_cmt2$long)])
+df_cmt2$population_nb <- factor(df_cmt2$population_nb, levels = df_cmt2$population_nb[order(df_cmt2$long)])
+
+df_cmt2$allele <- as.factor("CMT2")
+
+############ FBX5
+
+# Remove Cvi
+df_fbx5 <- df_fbx5_coord[!(df_fbx5_coord$population=="Cvi"),]
+
+# Order accession by longitude
+df_fbx5$population <- factor(df_fbx5$population, levels = df_fbx5$population[order(df_fbx5$long)])
+df_fbx5$population_nb <- factor(df_fbx5$population_nb, levels = df_fbx5$population_nb[order(df_fbx5$long)])
+
+df_fbx5$allele <- as.factor("FBX5")
+
+df_all_alleles <- rbind(df_vim2, df_cmt2, df_fbx5)
+
+
+#
+
+df_cmt2_coord$population_nb <- paste(df_cmt2_coord$population, " n=", df_cmt2_coord$total, sep="")
+
+# Remove Cvi
+df <- df_cmt2_coord[!(df_cmt2_coord$population=="Cvi"),]
+
+# Order accesstion by longitude
+df$population_nb <- factor(df$population_nb, levels = df$population_nb[order(df$long)], ordered=TRUE)
+
+
+
+########## Plot
+
+# Colorblind-friendly palette
+col <- c("#7570b3","#1b9e77","#d95f02")
+
+ggplot(data = df_all_alleles, aes(population_nb, freq_derived)) +
+  ggtitle("Derived allele frequencies per population") +
+  geom_bar(aes(x = population_nb, y = freq_derived, fill=allele), position="dodge", stat = "identity") + 
+  theme_bw() + scale_fill_manual(values=col) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("Derived allele frequency") +
+  xlab("Population") +
+  scale_y_continuous(labels = scales::percent) +  theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black"))
+
+```
+
+![](images/deletion_frequency_all_alleles.png)
 
 # Plot gbM by VIM2/4 allele
 
@@ -6684,6 +6766,230 @@ Each run generates 5 files:
 ../tepid_discover_log_15673.txt
 ```
 
+
+Copy paste seqID for FBX5 from the Supp. Table Excel file.
+
+```{bash, eval=FALSE}
+
+while read i; do
+  cat deletions_${i}.bed >> summary/deletions_FBX5_0.bed
+done < summary/list_FBX5_0.txt
+
+while read i; do
+  cat insertions_${i}.bed >> summary/insertions_FBX5_0.bed
+done < summary/list_FBX5_0.txt
+
+while read i; do
+  cat deletions_${i}.bed >> summary/deletions_FBX5_1.bed
+done < summary/list_FBX5_1.txt
+
+while read i; do
+  cat insertions_${i}.bed >> summary/insertions_FBX5_1.bed
+done < summary/list_FBX5_1.txt
+
+# Now sort and merge
+bedtools sort -i deletions_FBX5_0.bed | cut -f1-5 | uniq > deletions_FBX5_0.sorted.bed
+bedtools sort -i deletions_FBX5_1.bed | cut -f1-5 | uniq > deletions_FBX5_1.sorted.bed
+
+# More complicated for insertions as the coordinates are not exactly the same
+bedtools sort -i insertions_FBX5_1.bed | cut -f1,2,3,7  | uniq > insertions_FBX5_1.sorted.bed
+bedtools sort -i insertions_FBX5_0.bed | cut -f1,2,3,7 | uniq > insertions_FBX5_0.sorted.bed
+
+wc -l deletions_FBX5_*.sorted.bed
+2039 deletions_FBX5_0.sorted.bed
+2017 deletions_FBX5_1.sorted.bed
+
+
+# Not in common
+bedtools intersect -v -a deletions_FBX5_0.bed -b deletions_FBX5_1.bed > deletions_unique_FBX5_0.bed
+bedtools intersect -v -a deletions_FBX5_1.bed -b deletions_FBX5_0.bed > deletions_unique_FBX5_1.bed
+
+wc -l deletions_unique_FBX5_*
+  303 deletions_unique_FBX5_0.bed
+  272 deletions_unique_FBX5_1.bed
+
+```
+
+303 deletions unique to FBX5ref, 284 deletions unique to FBX5stop.
+
+127 accessions FBX5ref and 62 accessions with FBX5stop.
+
+
+```{bash, eval=FALSE}
+
+while read i; do
+  cat deletions_${i}.bed >> summary/deletions_CMT2_0.bed
+done < summary/list_CMT2_0.txt
+
+while read i; do
+  cat insertions_${i}.bed >> summary/insertions_CMT2_0.bed
+done < summary/list_CMT2_0.txt
+
+while read i; do
+  cat deletions_${i}.bed >> summary/deletions_CMT2_1.bed
+done < summary/list_CMT2_1.txt
+
+while read i; do
+  cat insertions_${i}.bed >> summary/insertions_CMT2_1.bed
+done < summary/list_CMT2_1.txt
+
+# Now sort and merge
+bedtools sort -i deletions_CMT2_0.bed | cut -f1-5 | uniq > deletions_CMT2_0.sorted.bed
+bedtools sort -i deletions_CMT2_1.bed | cut -f1-5 | uniq > deletions_CMT2_1.sorted.bed
+
+
+bedtools sort -i insertions_CMT2_1.bed | cut -f1,2,3,7  | uniq > insertions_CMT2_1.sorted.bed
+bedtools sort -i insertions_CMT2_0.bed | cut -f1,2,3,7 | uniq > insertions_CMT2_0.sorted.bed
+
+
+wc -l summary/deletions_CMT2_0.sorted.bed
+2110 summary/deletions_CMT2_0.sorted.bed
+
+wc -l summary/deletions_CMT2_1.sorted.bed
+1820 summary/deletions_CMT2_1.sorted.bed
+
+
+# Not in common 
+bedtools intersect -v -a deletions_CMT2_0.sorted.bed -b deletions_CMT2_1.sorted.bed > deletions_unique_CMT2_0.bed
+bedtools intersect -v -a deletions_CMT2_1.sorted.bed -b deletions_CMT2_0.sorted.bed > deletions_unique_CMT2_1.bed
+
+wc -l deletions_unique_CMT2_*
+  383 deletions_unique_CMT2_0.bed
+   99 deletions_unique_CMT2_1.bed
+
+```
+
+383 deletions unique to CMT2ref and 99 deletions unique to CMT2stop. It makes sense as there are only 60 accessions with the CMT2stop allele while 130 accessions have the CMT2ref allele.
+
+Check by permutation
+
+
+```{r}
+
+# Permutation CMT2stop (60 accessions)
+
+for j in {1..20}; do
+  shuf all_190_seqid.txt | head -n 60 > summary/permutations_CMT2/rand_60_seqid_${j}.txt
+  while read i; do
+    cat deletions_${i}.bed 
+  done < summary/permutations_CMT2/rand_60_seqid_${j}.txt | bedtools sort -i - | cut -f1-5 | uniq > summary/permutations_CMT2/deletions_rand_60_${j}.bed
+done
+
+wc -l summary/permutations_CMT2/deletions_rand_60_*
+   2011 summary/permutations_CMT2/deletions_rand_60_1.bed
+   2017 summary/permutations_CMT2/deletions_rand_60_10.bed
+   1939 summary/permutations_CMT2/deletions_rand_60_11.bed
+   1925 summary/permutations_CMT2/deletions_rand_60_12.bed
+   1966 summary/permutations_CMT2/deletions_rand_60_13.bed
+   1945 summary/permutations_CMT2/deletions_rand_60_14.bed
+   1919 summary/permutations_CMT2/deletions_rand_60_15.bed
+   1966 summary/permutations_CMT2/deletions_rand_60_16.bed
+   1887 summary/permutations_CMT2/deletions_rand_60_17.bed
+   2025 summary/permutations_CMT2/deletions_rand_60_18.bed
+   2005 summary/permutations_CMT2/deletions_rand_60_19.bed
+   2010 summary/permutations_CMT2/deletions_rand_60_2.bed
+   1896 summary/permutations_CMT2/deletions_rand_60_20.bed
+   1930 summary/permutations_CMT2/deletions_rand_60_3.bed
+   1890 summary/permutations_CMT2/deletions_rand_60_4.bed
+   1981 summary/permutations_CMT2/deletions_rand_60_5.bed
+   1958 summary/permutations_CMT2/deletions_rand_60_6.bed
+   2021 summary/permutations_CMT2/deletions_rand_60_7.bed
+   2038 summary/permutations_CMT2/deletions_rand_60_8.bed
+   1873 summary/permutations_CMT2/deletions_rand_60_9.bed
+
+
+# Permutation CMT2ref (130 accessions)
+   
+for j in {1..20}; do
+  shuf all_190_seqid.txt | head -n 130 > summary/permutations_CMT2/rand_130_seqid_${j}.txt
+  while read i; do
+    cat deletions_${i}.bed 
+  done < summary/permutations_CMT2/rand_130_seqid_${j}.txt | bedtools sort -i - | cut -f1-5 | uniq > summary/permutations_CMT2/deletions_rand_130_${j}.bed
+done
+
+wc -l summary/permutations_CMT2/deletions_rand_130_*
+   2113 summary/permutations_CMT2/deletions_rand_130_1.bed
+   2142 summary/permutations_CMT2/deletions_rand_130_10.bed
+   2141 summary/permutations_CMT2/deletions_rand_130_11.bed
+   2146 summary/permutations_CMT2/deletions_rand_130_12.bed
+   2142 summary/permutations_CMT2/deletions_rand_130_13.bed
+   2142 summary/permutations_CMT2/deletions_rand_130_14.bed
+   2150 summary/permutations_CMT2/deletions_rand_130_15.bed
+   2170 summary/permutations_CMT2/deletions_rand_130_16.bed
+   2127 summary/permutations_CMT2/deletions_rand_130_17.bed
+   2080 summary/permutations_CMT2/deletions_rand_130_18.bed
+   2141 summary/permutations_CMT2/deletions_rand_130_19.bed
+   2138 summary/permutations_CMT2/deletions_rand_130_2.bed
+   2144 summary/permutations_CMT2/deletions_rand_130_20.bed
+   2118 summary/permutations_CMT2/deletions_rand_130_3.bed
+   2147 summary/permutations_CMT2/deletions_rand_130_4.bed
+   2126 summary/permutations_CMT2/deletions_rand_130_5.bed
+   2108 summary/permutations_CMT2/deletions_rand_130_6.bed
+   2111 summary/permutations_CMT2/deletions_rand_130_7.bed
+   2160 summary/permutations_CMT2/deletions_rand_130_8.bed
+   2103 summary/permutations_CMT2/deletions_rand_130_9.bed
+
+   
+# Deletions unique to permuted CMT2stop
+for i in {1..20}; do   
+   bedtools intersect -v -a summary/permutations_CMT2/deletions_rand_60_${i}.bed -b summary/permutations_CMT2/deletions_rand_130_${i}.bed | wc -l
+done | sort -n
+8
+9
+14
+16
+20
+21
+22
+23
+23
+23
+25
+27
+29
+29
+33
+35
+46
+48
+53
+73
+
+
+
+# Deletions unique to permuted CMT2ref
+for i in {1..20}; do
+  bedtools intersect -v -a summary/permutations_CMT2/deletions_rand_130_${i}.bed -b summary/permutations_CMT2/deletions_rand_60_${i}.bed | wc -l
+done | sort -n
+
+128
+137
+143
+145
+149
+152
+164
+180
+191
+196
+212
+212
+225
+226
+229
+250
+251
+260
+265
+277
+
+
+
+
+```
+
+
+
 ## Summarize TEPID output
 
 ```{bash, eval=FALSE}
@@ -6759,6 +7065,493 @@ mv TE_indel_TEPID_all.txt TE_indel_TEPID.txt
 
 ```
 
+
+
+
+## Get segregating TEs only
+
+
+### Deletions
+
+```{bash, eval=FALSE}
+
+cd /srv/netscratch/irg/grp_hancock/johan/tepid_pipeline/CPV_fastq/all_CPV
+
+
+mkdir SA_data
+
+while read i; do
+mv *_${i}.* SA_data
+done < list_190_seqid.txt
+
+cd SA_data
+
+cat deletions_*.bed | cut -f1-5 | sort | uniq > all_deletions.bed
+
+wc -l all_deletions.bed
+2209 all_deletions.bed
+
+# Now check for each accessions if each deletions is present or absent
+cp ../list_190_seqid.txt .
+
+while read j; do
+  while read i; do
+    if [[ `grep -w "$i" deletions_${j}.bed` ]]; then
+      echo "1" >> summary_deletions_${j}.txt
+    else
+      echo "0" >> summary_deletions_${j}.txt
+    fi
+  done < all_deletions.bed
+done < list_190_seqid.txt
+
+paste summary_deletions_*txt > matrix_deletions_190.txt
+
+awk '{print NF; exit}' matrix_deletions_190.txt
+190
+
+
+# add unique deletion number as ID
+for i in {1..2209}; do
+  del=$(sed -n ${i}p all_deletions.bed)
+  echo -e "${del}\tID_${i}"
+done > all_deletions_with_ID.bed
+
+cut -f1 all_deletions_with_ID.bed | sort | uniq -c
+    628 Chr1
+    332 Chr2
+    419 Chr3
+    390 Chr4
+    440 Chr5
+
+
+cut -f6 all_deletions_with_ID.bed | paste - matrix_deletions_190.txt > matrix_deletions_190_with_ID.txt
+
+```
+
+### Insertions
+
+```{bash, eval=FALSE}
+# For insertions, it is more complicated because I need to look at overlap (>80%)
+
+# Check https://plink.readthedocs.io/en/latest/bedtools_int/
+cat insertions_*.bed | cut -f1,2,3,7 | sort | uniq > all_insertions.bed
+
+# Collapse overlapping feature and merge names if not different
+bedtools sort -i all_insertions.bed | bedtools merge -i - -c 4 -o distinct > all_insertions.merged.bed
+
+wc -l all_insertions.merged.bed
+4899 all_insertions.merged.bed
+
+
+# Get coordinates of the insertion and check if present in each accession
+
+for i in {1..4899}; do
+  sed -n ${i}p all_insertions.merged.bed > tmp.bed
+  while read j; do
+    if [[ `bedtools intersect -a tmp.bed -b deletions_${j}.bed -f 0.8` ]]; then
+      echo "1" >> summary_insertions_${j}.txt
+    else
+      echo "0" >> summary_insertions_${j}.txt
+    fi
+  done < list_190_seqid.txt
+  rm tmp.bed
+done
+
+paste summary_insertions_*txt > matrix_insertions_190.txt
+
+awk '{print NF; exit}' matrix_insertions_190.txt
+190
+
+# Add ID 
+for i in {1..4899}; do
+  ins=$(sed -n ${i}p all_insertions.merged.bed)
+  echo -e "${ins}\tID_${i}"
+done > all_insertions_with_ID.merged.bed
+
+cut -f1 all_insertions_with_ID.merged.bed | sort | uniq -c
+   1050 Chr1
+   1012 Chr2
+    993 Chr3
+    821 Chr4
+   1023 Chr5
+
+  cut -f5 all_insertions_with_ID.merged.bed | paste - matrix_insertions_190.txt > matrix_insertions_190_with_ID.txt
+
+```
+
+### Make matrix
+
+```{bash, eval=FALSE}
+# Add accessions ID
+awk '
+{
+    for (i=1; i<=NF; i++)  {
+        a[NR,i] = $i
+    }
+}
+NF>p { p = NF }
+END {
+    for(j=1; j<=p; j++) {
+        str=a[1,j]
+        for(i=2; i<=NR; i++){
+            str=str" "a[i,j];
+        }
+        print str
+    }
+}' list_190_seqid.txt >> header_matrix.txt
+
+# Change space into tab
+cat header_matrix.txt | tr -s " " '\t' > header_matrix1.txt
+mv header_matrix1.txt header_matrix.txt
+
+# Add "ID" manually as first col
+
+# Create matrix files with headers
+cat header_matrix.txt matrix_insertions_190_with_ID.txt > matrix_insertions_190_with_ID_with_header.txt
+cat header_matrix.txt matrix_deletions_190_with_ID.txt > matrix_deletions_190_with_ID_with_header.txt
+
+# Copy files into project folder
+cp matrix_deletions_190_with_ID_with_header.txt matrix_insertions_190_with_ID_with_header.txt all_insertions_with_ID.merged.bed all_deletions_with_ID.bed ~/SCRIPTS/TEs_analysis/TEPID_output
+
+```
+
+
+
+### Analysis segregating TEs
+
+```{r}
+
+matrix_deletions_SA <- read.delim("data/tepid/matrix_deletions_190_with_ID_with_header.txt", row.names=1)
+
+matrix_insertions_SA <- read.delim("data/tepid/matrix_insertions_190_with_ID_with_header.txt", row.names=1)
+
+ID_deletions <- read.delim("data/tepid/all_deletions_with_ID.bed", header = F)
+colnames(ID_deletions) <- c("chr","start","end","strand","TE","ID")
+ID_deletions$ID <- as.factor(ID_deletions$ID)
+
+ID_insertions <- read.delim("data/tepid/all_insertions_with_ID.merged.bed", header = F)
+colnames(ID_insertions) <- c("chr","start","end","TE","ID")
+ID_insertions$ID <- as.factor(ID_insertions$ID)
+
+```
+
+
+Filter TEs that segregate:
+
+```{r}
+# 2177/2209 TE deletions segregate
+sum(rowSums(matrix_deletions_SA) != 190)
+
+# 4897/4899 are segregating
+sum(rowSums(matrix_insertions_SA) != 190)
+
+```
+
+### Type of TEs
+
+Check the type of TEs.
+
+```{r}
+df_TEs <- read.delim("data/tepid/TAIR10_Transposable_Elements_RepEnrich.txt", header=FALSE)
+
+colnames(df_TEs) <- c("chr","start","end","TE","family","superfamily")
+
+deletions_SA_TE <- merge.data.frame(ID_deletions, df_TEs, by="TE")
+
+insertions_SA_TE <- merge.data.frame(ID_insertions, df_TEs, by="TE")
+
+```
+
+Get summary of TE id with family
+
+```{r}
+
+matrix_deletions_SA <- read.delim("data/tepid/matrix_deletions_190_with_ID_with_header.txt", row.names=1)
+
+```
+
+Status allele for the 190 accessions for the 3 variants.For 12849, FBX5 call was heterozygous and was then assigned "NA". To avoid bug, I assigned 0 in the allele_id.txt file.
+
+```{r}
+
+allele_id <- read.delim("data/tepid/allele_id.txt")
+allele_id$seqIDX <- paste("X",allele_id$seqID,sep="")
+allele_id$seqIDX <- as.factor(allele_id$seqIDX)
+
+# Check if ID fit in df and matrix
+#allele_id$seqIDX == colnames(matrix_deletions_SA)
+#allele_id$seqIDX == colnames(matrix_insertions_SA)
+
+```
+
+
+```{r}
+
+idx <- allele_id$FBX5=="0" # Does not work with FBX5 due to the NA 
+
+hist(rowSums(matrix_deletions_SA[,allele_id$FBX5=="0"]))
+hist(rowSums(matrix_deletions_SA[,allele_id$FBX5=="1"]))
+
+hist(rowSums(matrix_insertions_SA[,allele_id$FBX5=="0"]))
+hist(rowSums(matrix_insertions_SA[,allele_id$FBX5=="1"]))
+
+```
+
+```{r}
+hist(rowSums(matrix_deletions_SA[,allele_id$CMT2=="0"]))
+hist(rowSums(matrix_deletions_SA[,allele_id$CMT2=="1"]))
+
+
+hist(rowSums(matrix_insertions_SA[,allele_id$CMT2=="0"]))
+hist(rowSums(matrix_insertions_SA[,allele_id$CMT2=="1"]))
+
+hist(rowSums(matrix_deletions_SA))
+```
+
+```{r}
+df_TEs_superfamily <- df_TEs %>%
+  group_by(superfamily) %>%
+  summarise(counts = n()) 
+
+# Stacked bar plots of y = counts by x = cut,
+# colored by the variable color
+ggplot(df_TEs_superfamily, aes(x = superfamily, y = counts)) +
+  geom_bar(stat = "identity", position = position_stack()) + theme_bw() + theme(axis.text.x = element_text(angle=90, hjust=1)) + ggtitle("31,189 TEs TAIR10")
+
+```
+
+
+```{r}
+deletions_SA_TE_summary <- deletions_SA_TE %>%
+  group_by(superfamily) %>%
+  summarise(counts = n()) 
+
+ggplot(deletions_SA_TE_summary, aes(x = superfamily, y = counts)) +
+  geom_bar(stat = "identity", position = position_stack()) + theme_bw() +theme(axis.text.x = element_text(angle=90, hjust=1)) + ggtitle("2209 deletions in SA")
+
+```
+
+```{r}
+insertions_SA_TE_summary <- insertions_SA_TE %>%
+  group_by(superfamily) %>%
+  summarise(counts = n())
+
+ggplot(insertions_SA_TE_summary, aes(x = superfamily, y = counts)) +
+  geom_bar(stat = "identity", position = position_stack()) + theme_bw() +theme(axis.text.x = element_text(angle=90, hjust=1)) + ggtitle("4899 insertions in SA")
+```
+
+
+
+
+```{r}
+insertions_SA_TE_summary$category <- "insertions"
+deletions_SA_TE_summary$category <- "deletions"
+
+SA_TE_summary <- rbind(insertions_SA_TE_summary, deletions_SA_TE_summary)
+
+ggplot(SA_TE_summary, aes(x = superfamily, y = counts, fill=category)) +
+  geom_bar(position="dodge",stat = "identity") + theme_bw() +theme(axis.text.x = element_text(angle=90, hjust=1)) + ggtitle("TE insertions and deletions in SA") +  theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black")) + 
+      theme(plot.title = element_text(hjust = 0.5)) + 
+      scale_y_continuous(labels = scales::comma_format())
+
+```
+
+It seems the LTR_Gypsy family is enriched for insertions
+
+```{r}
+
+insertions_SA_TE_summary <- insertions_SA_TE %>% filter(superfamily=="LTR_Gypsy") %>%
+  group_by(family) %>%
+  summarise(counts = n())
+
+deletions_SA_TE_summary <- deletions_SA_TE %>% filter(superfamily=="LTR_Gypsy") %>%
+  group_by(family) %>%
+  summarise(counts = n()) 
+
+insertions_SA_TE_summary$category <- "insertions"
+deletions_SA_TE_summary$category <- "deletions"
+
+SA_TE_summary <- rbind(insertions_SA_TE_summary, deletions_SA_TE_summary)
+
+ggplot(SA_TE_summary, aes(x = family, y = counts, fill = category)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("TE insertions and deletions in SA") +
+  theme(
+    axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"),
+    axis.ticks = element_line(color = "black")
+  ) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(labels = scales::comma_format())
+
+```
+
+
+```{r}
+insertions_SA_TE %>% filter(family=="ATHILA6A")
+```
+
+
+
+### ATCOPIA93
+
+```{r}
+
+insertions_SA_TE_summary <- insertions_SA_TE %>% filter(family=="ATHILA6A") %>%
+  group_by(family) %>%
+  summarise(counts = n())
+
+deletions_SA_TE_summary <- deletions_SA_TE %>% filter(family=="ATHILA6A") %>%
+  group_by(family) %>%
+  summarise(counts = n()) 
+
+insertions_SA_TE_summary$category <- "insertions"
+deletions_SA_TE_summary$category <- "deletions"
+
+SA_TE_summary <- rbind(insertions_SA_TE_summary, deletions_SA_TE_summary)
+
+ggplot(SA_TE_summary, aes(x = family, y = counts, fill = category)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle("TE insertions and deletions in SA") +
+  theme(
+    axis.text.x = element_text(color = "black"), axis.text.y = element_text(color = "black"),
+    axis.ticks = element_line(color = "black")
+  ) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_y_continuous(labels = scales::comma_format())
+
+```
+
+
+### Permutation
+
+```{r}
+plot_permutation <- function(vector_permutation, observed_value, ylab) {
+  observed_value <- as.integer(observed_value)
+  vector_permutation <- as.vector(vector_permutation)
+
+  df <- as.data.frame(matrix(nrow = length(vector_permutation), ncol = 1))
+
+  names(df) <- "value"
+
+  df$value <- as.integer(vector_permutation)
+
+  ggplot(df, aes(x = "", y = value)) +
+    geom_boxplot(outlier.shape = NA) +
+    geom_point(position = position_jitter()) +
+    theme_bw() +
+    ylab(ylab) +
+    xlab("") +
+    geom_hline(yintercept = observed_value, col = "red") +
+    theme(
+      axis.text.x = element_text(color = "black"),
+      axis.text.y = element_text(color = "black"),
+      axis.ticks = element_line(color = "black")
+    )
+}
+
+```
+
+
+#### Permutation CMT2
+
+130 0s, 60 1s
+
+Real values of insertions and deletions:
+
+```{r}
+CMT2_0_del <- rowSums(matrix_deletions_SA[,allele_id$CMT2=="0"])
+CMT2_1_del <- rowSums(matrix_deletions_SA[,allele_id$CMT2=="1"])
+
+CMT2_0_ins <- rowSums(matrix_insertions_SA[,allele_id$CMT2=="0"])
+CMT2_1_ins <- rowSums(matrix_insertions_SA[,allele_id$CMT2=="1"])
+
+
+CMT2_0_del <- colSums(matrix_deletions_SA[,allele_id$CMT2=="0"])
+CMT2_1_del <- colSums(matrix_deletions_SA[,allele_id$CMT2=="1"])
+
+CMT2_0_ins <- colSums(matrix_insertions_SA[,allele_id$CMT2=="0"])
+CMT2_1_ins <- colSums(matrix_insertions_SA[,allele_id$CMT2=="1"])
+```
+
+Permutation:
+
+```{r}
+names_id <- colnames(matrix_deletions_SA)[allele_id$CMT2=="0"]
+matrix_deletions_SA_CMT2_0 <- matrix_deletions_SA[names_id]
+
+list1 <- c()
+for (i in 1:1000){
+  list1[i] <- (mean(colSums(matrix_deletions_SA_CMT2_0[,sample(names_id, 60)])))
+}
+
+plot_permutation(list1, mean(CMT2_1_del), ylab = "Mean # TE deletions/accession") + ggtitle("Permutation deletions CMT2") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+Permutation:
+
+```{r}
+names_id <- colnames(matrix_insertions_SA)[allele_id$CMT2=="0"]
+matrix_insertions_SA_CMT2_0 <- matrix_insertions_SA[names_id]
+
+list1 <- c()
+for (i in 1:1000){
+  list1[i] <- (mean(colSums(matrix_insertions_SA_CMT2_0[,sample(names_id, 60)])))
+}
+
+plot_permutation(list1, mean(CMT2_1_ins), ylab = "Mean # TE insertions/accession") + ggtitle("Permutation insertions CMT2") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+#### Permutation FBX5
+
+128 0s, 62 1s
+
+Real values of insertions and deletions:
+
+```{r}
+FBX5_0_del <- colSums(matrix_deletions_SA[,allele_id$FBX5=="0"])
+FBX5_1_del <- colSums(matrix_deletions_SA[,allele_id$FBX5=="1"])
+
+FBX5_0_ins <- colSums(matrix_insertions_SA[,allele_id$FBX5=="0"])
+FBX5_1_ins <- colSums(matrix_insertions_SA[,allele_id$FBX5=="1"])
+
+```
+
+Permutation:
+
+```{r}
+names_id <- colnames(matrix_deletions_SA)[allele_id$FBX5=="0"]
+matrix_deletions_SA_FBX5_0 <- matrix_deletions_SA[names_id]
+
+list1 <- c()
+for (i in 1:1000){
+  list1[i] <- (mean(colSums(matrix_deletions_SA_FBX5_0[,sample(names_id, 62)])))
+}
+
+plot_permutation(list1, mean(FBX5_1_del), ylab = "Mean # TE deletions/accession") + ggtitle("Permutation deletions FBX5") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+names_id <- colnames(matrix_insertions_SA)[allele_id$FBX5=="0"]
+matrix_insertions_SA_FBX5_0 <- matrix_insertions_SA[names_id]
+
+list1 <- c()
+for (i in 1:1000){
+  list1[i] <- (mean(colSums(matrix_insertions_SA_FBX5_0[,sample(names_id, 62)])))
+}
+
+plot_permutation(list1, mean(FBX5_1_ins), ylab = "Mean # TE insertions/accession") + ggtitle("Permutation insertions FBX5") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Analysis all TEs
+
 Import this file in Excel and merge with the genotyping call for VIM2, CMT2, and FBX5 (supplementary table X) also put in text file `data/TE_indel_TEPID.txt`.
 
 ```{r}
@@ -6796,9 +7589,34 @@ TE_plot_per_allele <- function(df, type, group){
 
 ```
 
-## Analysis all TEs
+
 
 ### CMT2
+
+```{r}
+
+df_TE_SA$accession <- factor(df_TE_SA$accession , levels=df_TE_SA$accession[order(df_TE_SA$TE_deletions)])
+
+ggplot(df_TE_SA, aes(accession, TE_deletions)) + geom_bar(aes(x=accession, y=TE_deletions, fill=CMT2), position="dodge", stat="identity") + ggtitle("TE deletions") + theme(axis.text.x = element_text(color="black"), 
+    axis.text.y = element_text(color="black"),
+    axis.ticks = element_line(color = "black")) + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_y_continuous(labels = scales::comma_format()) + 
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+df_TE_SA$accession <- factor(df_TE_SA$accession , levels=df_TE_SA$accession[order(df_TE_SA$TE_insertions)])
+
+ggplot(df_TE_SA, aes(accession, TE_insertions)) + geom_bar(aes(x=accession, y=TE_insertions, fill=CMT2), position="dodge", stat="identity") + ggtitle("TE insertions")+  theme(axis.text.x = element_text(color="black"), 
+    axis.text.y = element_text(color="black"),
+    axis.ticks = element_line(color = "black")) + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_y_continuous(labels = scales::comma_format()) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+
+```
+
+
 
 #### Transpositions
 
@@ -6943,6 +7761,28 @@ alternative hypothesis: true location shift is not equal to 0
 
 ### FBX5
 
+```{r}
+
+df_TE_SA$accession <- factor(df_TE_SA$accession , levels=df_TE_SA$accession[order(df_TE_SA$TE_deletions)])
+
+ggplot(df_TE_SA, aes(accession, TE_deletions)) + geom_bar(aes(x=accession, y=TE_deletions, fill=FBX5), position="dodge", stat="identity") + ggtitle("TE deletions") + theme(axis.text.x = element_text(color="black"), 
+    axis.text.y = element_text(color="black"),
+    axis.ticks = element_line(color = "black")) + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_y_continuous(labels = scales::comma_format()) + 
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+df_TE_SA$accession <- factor(df_TE_SA$accession , levels=df_TE_SA$accession[order(df_TE_SA$TE_insertions)])
+
+ggplot(df_TE_SA, aes(accession, TE_insertions)) + geom_bar(aes(x=accession, y=TE_insertions, fill=FBX5), position="dodge", stat="identity") + ggtitle("TE insertions")+  theme(axis.text.x = element_text(color="black"), 
+    axis.text.y = element_text(color="black"),
+    axis.ticks = element_line(color = "black")) + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_y_continuous(labels = scales::comma_format()) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+```
+
 #### Transpositions
 
 ```{r}
@@ -7084,6 +7924,112 @@ alternative hypothesis: true location shift is not equal to 0
 ```
 
 Significant difference (p-value = 0.16%)
+
+
+
+### VIM2
+
+```{r}
+
+df_TE_SA$accession <- factor(df_TE_SA$accession , levels=df_TE_SA$accession[order(df_TE_SA$TE_deletions)])
+
+ggplot(df_TE_SA, aes(accession, TE_deletions)) + geom_bar(aes(x=accession, y=TE_deletions, fill=VIM2), position="dodge", stat="identity") + ggtitle("TE deletions") + theme(axis.text.x = element_text(color="black"), 
+    axis.text.y = element_text(color="black"),
+    axis.ticks = element_line(color = "black")) + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_y_continuous(labels = scales::comma_format()) + 
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+df_TE_SA$accession <- factor(df_TE_SA$accession , levels=df_TE_SA$accession[order(df_TE_SA$TE_insertions)])
+
+ggplot(df_TE_SA, aes(accession, TE_insertions)) + geom_bar(aes(x=accession, y=TE_insertions, fill=VIM2), position="dodge", stat="identity") + ggtitle("TE insertions")+  theme(axis.text.x = element_text(color="black"), 
+    axis.text.y = element_text(color="black"),
+    axis.ticks = element_line(color = "black")) + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_y_continuous(labels = scales::comma_format()) +
+  theme(axis.text.x = element_text(angle=90, hjust=1))
+
+```
+
+
+```{r}
+df_TE_SA %>% filter(FBX5!="NA") %>% ggplot(aes_string(x="CMT2", y="TE_deletions", color="FBX5")) +
+    theme_bw()+
+    geom_boxplot() + ggtitle("TE deletions") +
+    geom_point(position=position_jitterdodge(), size=1) +
+    theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+```{r}
+df_TE_SA %>% filter(FBX5!="NA") %>% ggplot(aes_string(x="CMT2", y="TE_insertions", color="FBX5")) +
+    theme_bw()+
+    geom_boxplot() + ggtitle("TE insertions") +
+    geom_point(position=position_jitterdodge(), size=1) +
+    theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+```{r}
+df_TE_SA %>% filter(FBX5!="NA") %>% ggplot(aes_string(x="CMT2", y="TE_insertions", color="VIM2")) +
+    theme_bw()+
+    geom_boxplot() + ggtitle("TE insertions") +
+    geom_point(position=position_jitterdodge(), size=1) +
+    theme(plot.title = element_text(hjust = 0.5))
+
+df_TE_SA %>% filter(FBX5!="NA") %>% ggplot(aes_string(x="CMT2", y="TE_deletions", color="VIM2")) +
+    theme_bw()+
+    geom_boxplot() + ggtitle("TE deletions") +
+    geom_point(position=position_jitterdodge(), size=1) +
+    theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
+```{r}
+df_TE_SA %>% filter(FBX5!="NA") %>% ggplot(aes_string(x="FBX5", y="TE_insertions", color="VIM2")) +
+    theme_bw()+
+    geom_boxplot() + ggtitle("TE insertions") +
+    geom_point(position=position_jitterdodge(), size=1) +
+    theme(plot.title = element_text(hjust = 0.5))
+
+df_TE_SA %>% filter(FBX5!="NA") %>% ggplot(aes_string(x="FBX5", y="TE_deletions", color="VIM2")) +
+    theme_bw()+
+    geom_boxplot() + ggtitle("TE deletions") +
+    geom_point(position=position_jitterdodge(), size=1) +
+    theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
+
+### Summary
+
+```{r}
+
+df_TE_SA_long_deletions <- df_TE_SA %>% select(TE_deletions, accession, VIM2, CMT2, FBX5)
+
+df_TE_SA_long_deletions$VIM2 <- as.character(df_TE_SA_long_deletions$VIM2)
+df_TE_SA_long_deletions$CMT2 <- as.character(df_TE_SA_long_deletions$CMT2)
+df_TE_SA_long_deletions$FBX5 <- as.character(df_TE_SA_long_deletions$FBX5)
+
+df_TE_SA_long_deletions['VIM2'][df_TE_SA_long_deletions['VIM2'] == "1"] <- "VIM2del"
+df_TE_SA_long_deletions['VIM2'][df_TE_SA_long_deletions['VIM2'] == "0"] <- "VIM2ref"
+
+df_TE_SA_long_deletions['CMT2'][df_TE_SA_long_deletions['CMT2'] == "1"] <- "CMT2stop"
+df_TE_SA_long_deletions['CMT2'][df_TE_SA_long_deletions['CMT2'] == "0"] <- "CMT2ref"
+
+df_TE_SA_long_deletions['FBX5'][df_TE_SA_long_deletions['FBX5'] == "1"] <- "FBX5stop"
+df_TE_SA_long_deletions['FBX5'][df_TE_SA_long_deletions['FBX5'] == "0"] <- "FBX5ref"
+
+test <- pivot_longer(df_TE_SA_long_deletions, cols=VIM2:FBX5,
+                                        names_to="gene",
+                                        values_to="allele")
+
+table(test$TE_deletions, test$allele)
+
+```
 
 
 
@@ -7285,6 +8231,8 @@ W = 2868, p-value = 0.002475
 alternative hypothesis: true location shift is not equal to 0
 ```
 
+Significant difference (p-value = 0.2%).
+
 #### Deletions
 
 ```{r}
@@ -7380,6 +8328,190 @@ alternative hypothesis: true location shift is not equal to 0
 
 Significant difference (p-value = 1.4%).
 
+
+# ################################
+
+# Summary by family
+
+
+```{r}
+
+matrix_deletions_TE <- matrix_deletions_SA %>% rownames_to_column("ID")
+
+matrix_deletions_TE$ID <- as.factor(matrix_deletions_TE$ID)
+
+deletions_SA_TE_ID <- deletions_SA_TE %>% dplyr::select(ID, TE, family, superfamily)
+
+matrix_deletions_TE_2 <- merge(matrix_deletions_TE, deletions_SA_TE_ID, by="ID")
+
+matrix_deletions_TE_2 <- matrix_deletions_TE_2 %>% dplyr::select(c(ID, TE, family, superfamily), everything())
+
+matrix_deletions_TE_2$TE <-as.factor(matrix_deletions_TE_2$TE)
+matrix_deletions_TE_2$family <-as.factor(matrix_deletions_TE_2$family)
+matrix_deletions_TE_2$superfamily <-as.factor(matrix_deletions_TE_2$superfamily)
+
+```
+
+```{r}
+
+for (i in 5:194){
+  matrix_deletions_TE_2[,i]
+}
+
+test <- matrix_deletions_TE_2[,1:5]
+
+
+group_by(test, superfamily) %>%
+  summarise(
+    count = n(),
+    sum = sum(X12766, na.rm = TRUE),
+  )
+
+test <- matrix_deletions_TE_2[,c(1,2,3,4,6)]
+
+
+tb1 <- group_by(test, superfamily) %>%
+  summarise(
+    count = n(),
+    sum = sum(X12849, na.rm = TRUE),
+  )
+
+summarize_TE <- function(index, matrix){
+  m1 <- matrix[,c(4,index)]
+  accession <- names(m1)[2]
+  tb1 <- group_by(m1, superfamily) %>%
+  summarise(
+    sum = sum(get(accession), na.rm = TRUE),
+  )
+  return(tb1$sum)
+}
+
+
+df1 <- data.frame(matrix(ncol = 190, nrow = 18))
+colnames(df1) <- names(matrix_deletions_TE_2)[5:194]
+
+for (i in 5:194){
+  j=i-4
+  df1[[j]] <- summarize_TE(i, matrix_deletions_TE_2)
+}
+
+df1$superfamily <- levels(matrix_deletions_TE_2$superfamily)
+
+# Convert to long
+df1_long <- df1 %>% gather(accession, number_TE, 1:190)
+
+df1_long$superfamily <- as.factor(df1_long$superfamily)
+df1_long$accession <- as.factor(df1_long$accession)
+
+# Encode CMT2 and FBX5 status
+df1_long_code <- merge(df1_long, allele_id, by.x="accession", by.y ="seqIDX")
+
+df1_long_code <- df1_long_code %>% mutate_at(c("VIM2","CMT2","FBX5"), as.factor) 
+
+```
+
+```{r}
+
+ggboxplot(df1_long_code, "superfamily", "number_TE",
+  color = "CMT2",
+  xlab = "TE superfamily", ylab = "Number of TE deletions", title = "TE deletions across super family",
+  palette = col,
+  add.params = list(size = 0.7, alpha = 0.2), outlier.shape = NA
+) +
+  rotate_x_text(45) + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r}
+
+ggboxplot(df1_long_code, "superfamily", "number_TE", color="FBX5", 
+          xlab="TE superfamily", ylab="Number of TE deletions", title="TE deletions across super family",
+          palette=col, 
+          add.params = list(size = 0.7, alpha = 0.2), outlier.shape = NA) + 
+  rotate_x_text(45) + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+```{r}
+
+ggboxplot(df1_long_code, "superfamily", "number_TE", color="VIM2", 
+          xlab="TE superfamily", ylab="Number of TE deletions", title="TE deletions across super family",
+          palette=col, 
+          add.params = list(size = 0.7, alpha = 0.2), outlier.shape = NA) + 
+  rotate_x_text(45) + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+# ###############################
+## Connection with RNA-seq data
+
+Check if correlation between transposition and expression from the RNA-seq data
+
+
+```{r}
+
+sig_TE_CMT2 <- read.table("data/significant_38_TEs_CMT2.txt", header = T)
+sig_TE_FBX5 <- read.table("data/significant_30_TEs_FBX5.txt", header = T)
+
+ID_del_sig_TE_CMT2 <- as.vector(ID_deletions[ID_deletions$TE %in% sig_TE_CMT2$geneID, 6])
+# 9 TEs found
+
+ID_del_sig_TE_FBX5 <- as.vector(ID_deletions[ID_deletions$TE %in% sig_TE_FBX5$geneID, 6])
+# 3 TEs found
+
+ID_ins_sig_TE_CMT2 <- as.vector(ID_insertions[ID_insertions$TE %in% sig_TE_CMT2$geneID, 5])
+# 15 TEs found
+
+ID_ins_sig_TE_FBX5 <- as.vector(ID_insertions[ID_insertions$TE %in% sig_TE_FBX5$geneID, 5])
+# 12 TEs found
+
+```
+
+
+Show TE activity for these subset:
+
+```{r}
+
+print("CMT2 TE deletions")
+mean(rowSums(matrix_deletions_SA[ID_del_sig_TE_CMT2, allele_id$CMT2 == "0"]))
+mean(rowSums(matrix_deletions_SA[ID_del_sig_TE_CMT2, allele_id$CMT2 == "1"]))
+
+print("FBX5 TE deletions")
+mean(rowSums(matrix_deletions_SA[ID_del_sig_TE_FBX5, allele_id$FBX5 == "0"]))
+mean(rowSums(matrix_deletions_SA[ID_del_sig_TE_FBX5, allele_id$FBX5 == "1"]))
+
+print("CMT2 TE insertions")
+mean(rowSums(matrix_insertions_SA[ID_ins_sig_TE_CMT2, allele_id$CMT2 == "0"]))
+mean(rowSums(matrix_insertions_SA[ID_ins_sig_TE_CMT2, allele_id$CMT2 == "1"]))
+
+print("FBX5 TE insertions")
+mean(rowSums(matrix_insertions_SA[ID_ins_sig_TE_FBX5, allele_id$FBX5 == "0"]))
+mean(rowSums(matrix_insertions_SA[ID_ins_sig_TE_FBX5, allele_id$FBX5 == "1"]))
+```
+```{r}
+
+print("CMT2 TE deletions")
+mean(rowSums(matrix_deletions_SA[sample(ID_deletions$ID, 9), allele_id$CMT2 == "0"]))
+mean(rowSums(matrix_deletions_SA[sample(ID_deletions$ID, 9), allele_id$CMT2 == "1"]))
+
+print("FBX5 TE deletions")
+mean(rowSums(matrix_deletions_SA[sample(ID_deletions$ID, 3), allele_id$FBX5 == "0"]))
+mean(rowSums(matrix_deletions_SA[sample(ID_deletions$ID, 3), allele_id$FBX5 == "1"]))
+
+print("CMT2 TE insertions")
+mean(rowSums(matrix_insertions_SA[sample(ID_insertions$ID, 15), allele_id$CMT2 == "0"]))
+mean(rowSums(matrix_insertions_SA[sample(ID_insertions$ID, 15), allele_id$CMT2 == "1"]))
+
+print("FBX5 TE insertions")
+mean(rowSums(matrix_insertions_SA[sample(ID_insertions$ID, 12), allele_id$FBX5 == "0"]))
+mean(rowSums(matrix_insertions_SA[sample(ID_insertions$ID, 12), allele_id$FBX5 == "1"]))
+
+
+```
+
+
+# #########################################
 
 # Marginal genealogical tree with RELATE
 
