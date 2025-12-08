@@ -2266,7 +2266,10 @@ ggplot(SA, aes(long, lat)) +
   labs(fill = "VIM2 alleles") +
   scale_fill_manual(values = c("coral2", "turquoise4")) +
   theme(axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16)) +
-  geom_scatterpie_legend(df_vim2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005)
+  geom_scatterpie_legend(df_vim2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005) +  theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black")) + 
+      theme(plot.title = element_text(hjust = 0.5))
 
 ```
 
@@ -2300,7 +2303,10 @@ ggplot(SA, aes(long, lat)) +
   labs(fill = "CMT2 alleles") +
   scale_fill_manual(values = c("coral2","turquoise4")) +
   theme(axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16)) +
-  geom_scatterpie_legend(df_cmt2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005)
+  geom_scatterpie_legend(df_cmt2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005) +  theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black")) + 
+      theme(plot.title = element_text(hjust = 0.5)) 
 
 ```
 
@@ -2334,7 +2340,10 @@ ggplot(SA, aes(long, lat)) +
   labs(fill = "FBX5 alleles") +
   scale_fill_manual(values = c("coral2","turquoise4")) +
   theme(axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16)) +
-  geom_scatterpie_legend(df_fbx5_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005)
+  geom_scatterpie_legend(df_fbx5_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005) +  theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black")) + 
+      theme(plot.title = element_text(hjust = 0.5)) 
 
 ```
 
@@ -8779,12 +8788,388 @@ python ${clues_inference}/inference.py \
 
 
 
+# Selective sweep analysis (figure 7)
+
+Script from Ahmed Elfarargi.
+
+```{bash}
+# 1. Selective sweep analysis (RAiSD)
+  
+  # bgzip and tabix
+  bgzip -c subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf > subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf.gz
+  tabix -p vcf subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf.gz
+  
+  # Split by Chr
+  for i in {1,2,3,4,5}; do 
+    bcftools view -r Chr${i} subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf.gz > subset_189_SA_accessions_biallelic_DP3_GQ25_Ch${i}.vcf
+  done
+  
+  # Run RAiSD
+  for i in {1..5}; do 
+    RAiSD -n Santo_RAiSD_w50_chr${i} -I subset_189_SA_accessions_biallelic_DP3_GQ25_Ch${i}.vcf -y 1 -A 0.905 -M 0 -w 50 -a 123 -D -R -P -O -s -f
+  done
+
+# 2. Pairwise Fst analysis using vcftools
+  vcftools \
+  --vcf subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf \
+  --weir-fst-pop picoespong.txt \
+  --weir-fst-pop covafig.txt \
+  --fst-window-size 10000 \
+  --fst-window-step 1000 \
+  --out picoespong_vs_covafig_w10k_s1k
+```
+
+```{r}
+
+# libraries
+library(tidyverse)
+library(sf)
+library(maptiles)
+library(tidyterra)
+library(terra)
+library(ggrepel)
+library(ggspatial)
+library(RColorBrewer)
+library(ggtext)
+library(glue)
+library(ggpubr) 
+library(cowplot)
+
+# ==============================================================================
+# load data 
+# ==============================================================================
+file_coords <- "santo_coords_inds.csv"
+file_pheno  <- "santo_pheno_data.csv"
+
+# order for variants
+target_order <- c("VIM2/VIM4", "CMT2", "FBX5")
+
+# RAiSD Files (Panel C)
+files_raisd <- c(
+  "Chr1" = "Santo_RAiSD_w50_chr1.Chr1",
+  "Chr2" = "Santo_RAiSD_w50_chr2.Chr2",
+  "Chr3" = "Santo_RAiSD_w50_chr3.Chr3",
+  "Chr4" = "Santo_RAiSD_w50_chr4.Chr4",
+  "Chr5" = "Santo_RAiSD_w50_chr5.Chr5"
+)
+
+# Fst File (Panel D)
+file_fst <- "picoespong_vs_covafig_w10k_s1k.windowed.weir.fst"
 
 
-# Author
+# ==============================================================================
+# Panel A: Geographical map
+# ==============================================================================
+data_a <- read.table("Santo_coords_groups.csv", header = TRUE, sep = ",") %>%
+  rename(Group = Region, Cluster = Group, n = N, lon = Longitude, lat = Latitude) %>%
+  arrange(Cluster, Group) %>%
+  mutate(Legend_Label = factor(paste0(Cluster, ": ", Group), levels = unique(paste0(Cluster, ": ", Group))))
+
+data_a$Group <- factor(data_a$Group, levels = unique(data_a$Group))
+
+points_sf <- st_as_sf(data_a, coords = c("lon", "lat"), crs = 4326)
+
+base_cols <- c("#0075DC", "yellow4", "#C20088", "#2BCE48")
+final_colors <- c()
+clusters <- unique(data_a$Cluster)
+
+for(i in seq_along(clusters)) {
+  grps <- data_a %>% filter(Cluster == clusters[i]) %>% pull(Legend_Label) %>% unique() %>% sort()
+  pal <- colorRampPalette(c("white", base_cols[i], "black"))(length(grps) + 4)[3:(length(grps) + 2)]
+  names(pal) <- grps
+  final_colors <- c(final_colors, pal)
+}
+
+bbox <- st_bbox(c(xmin = -25.1, xmax = -25.01, ymin = 17.09, ymax = 17.125), crs = st_crs(4326))
+tiles <- get_tiles(st_as_sfc(bbox), provider = "Esri.WorldImagery", zoom = 15, crop = TRUE)
+
+p_a <- ggplot() +
+  geom_spatraster_rgb(data = tiles, alpha = 0.6) +
+  geom_sf(data = points_sf, aes(color = Legend_Label, size = n), show.legend = "point") +
+  geom_label_repel(data = data_a, aes(lon, lat, label = Group, fill = Legend_Label),
+                   fontface = "bold", size = 4, box.padding = 0.5, color = "white", alpha = 0.8,
+                   min.segment.length = 0, max.overlaps = 20, show.legend = FALSE) +
+  scale_color_manual(values = final_colors) +
+  scale_fill_manual(values = final_colors) +
+  scale_size_area(max_size = 10, name = NULL) +
+  guides(color = "none", fill = "none", size = guide_legend(title.position = "top")) +
+  annotate("text", x=-25.085, y=17.12, label="Espongeiro", color="black", size = 6, fontface="bold") +
+  annotate("text", x=-25.060, y=17.10, label="Cova", color="black", size = 6, fontface="bold") +
+  annotate("text", x=-25.040, y=17.098, label="Figueira", color="black", size = 6, fontface="bold") +
+  annotate("text", x=-25.02, y=17.1075, label="Pico", color="black", size = 6, fontface="bold") +
+  annotation_scale(location = "br", width_hint = 0.2, style = "ticks", line_col = "black", text_col = "black") +
+  annotation_north_arrow(location = "tl", style = north_arrow_minimal(line_col = "black", text_col = "black"), height = unit(1, "cm")) +
+  coord_sf(xlim = c(-25.1, -25.01), ylim = c(17.09, 17.125), expand = FALSE) +
+  labs(tag = "a") +
+  theme_bw(base_size = 14) +
+  theme(
+    axis.text = element_blank(), axis.ticks = element_blank(), 
+    axis.title = element_blank(),
+    plot.tag = element_text(size = 20, face = "bold"),
+    legend.position = c(0.999, 0.999), 
+    legend.justification = c(1, 1),
+    legend.background = element_rect(fill = alpha("white", 0.8), color = "black", linewidth = 0.5),
+    legend.key = element_blank(),
+    legend.title = element_text(face = "bold", size = 10, hjust = 0.5),
+    legend.text = element_text(size = 10)
+  )
+
+# ==============================================================================
+# Panel B: Drived allele frequency
+# ==============================================================================
+cols_c <- c("Cova"="#0075DC", "Espongeiro"="yellow4", "Figueira"="#C20088", "Pico"="#2BCE48")
+cols_g <- c("CMT2"="navyblue", "FBX5"="coral2", "VIM2/VIM4"="palegreen4")
+ord_c <- c("Espongeiro", "Cova", "Figueira", "Pico")
+
+df_b <- read.csv(file_coords) %>%
+  pivot_longer(c(CMT2, FBX5, VIM2_4_DEL), names_to="Gene", values_to="Allele") %>%
+  mutate(Gene = ifelse(Gene == "VIM2_4_DEL", "VIM2/VIM4", Gene)) %>%
+  # CHANGED: Force Factor Order for Panel B
+  mutate(Gene = factor(Gene, levels = target_order)) %>%
+  group_by(Cluster, Group) %>%
+  mutate(n = n_distinct(SeqID)) %>%
+  group_by(Cluster, Group, n, Gene) %>%
+  summarise(Freq = sum(Allele == "Derived", na.rm=TRUE) / n(), .groups="drop") %>%
+  mutate(
+    xlb = paste0(Group, "\n(n=", n, ")"),
+    c_lbl = glue("<span style='color:{cols_c[Cluster]};'>{Cluster}</span>"),
+    num = as.numeric(str_extract(Group, "\\d+"))
+  ) %>%
+  arrange(factor(Cluster, levels=ord_c), num) %>%
+  mutate(
+    Cluster = factor(Cluster, levels=ord_c),
+    xlb = factor(xlb, levels=unique(xlb)),
+    c_lbl = factor(c_lbl, levels=unique(c_lbl))
+  )
+
+p_b <- ggplot(df_b, aes(xlb, Freq, fill=Gene)) +
+  geom_bar(stat="identity", position=position_dodge(0.8), width=0.7) +
+  scale_fill_manual(values=cols_g) +
+  scale_y_continuous(labels=scales::percent, limits=c(0, 1.05), expand=c(0,0)) +
+  facet_grid(~c_lbl, scales="free_x", space="free_x", switch="x") +
+  labs(x=NULL, y="Derived allele frequency", fill=NULL, tag = "b") + # CHANGED to lowercase
+  theme_bw(base_size=14) +
+  theme(
+    strip.text.x.bottom=element_markdown(face="bold", size=12, margin=margin(t=5, b=5)),
+    strip.background=element_rect(fill="white", color="black"),
+    strip.placement="outside",
+    axis.text.x=element_text(angle=0, hjust=0.5, size=10, color="black"),
+    axis.title.y=element_text(face="bold", margin=margin(r=10)),
+    legend.position="top",
+    panel.grid.major.x=element_blank(),
+    panel.grid.minor.x=element_blank(),
+    plot.tag = element_text(size = 20, face = "bold")
+  )
+
+
+# ==============================================================================
+# Panel C: RAISD histogram
+# ==============================================================================
+genes_c <- tibble(
+  name = c("CMT2", "FBX5", "VIM2/VIM4"),
+  chrom = c("Chr4", "Chr2", "Chr1"),
+  pos = c(10420088, 18513626, 24586731)
+)
+cols_c_plot <- c("CMT2" = "navyblue", "FBX5" = "coral2", "VIM2/VIM4" = "palegreen4")
+
+df_c <- map_dfr(files_raisd, read_tsv, col_names = c("p", "s", "e", "v", "sf", "ld", "stat"), col_types = cols(.default = "d"), skip = 1, .id = "chr")
+scores_c <- genes_c %>% rowwise() %>%
+  mutate(stat = df_c %>% filter(chr == chrom, s <= pos, e >= pos) %>% pull(stat) %>% max(na.rm = TRUE),
+         # CHANGED: Force Factor Order for Legend in C
+         name = factor(name, levels = target_order)) 
+         
+cut_c <- quantile(df_c$stat, 0.95, na.rm = TRUE)
+mx_c <- max(ggplot_build(ggplot(df_c, aes(stat)) + geom_histogram(bins = 50))$data[[1]]$count)
+
+p_c <- ggplot(df_c, aes(stat)) +
+  geom_histogram(bins = 50, fill = "grey50", color = "black", alpha = 0.8) +
+  geom_vline(xintercept = cut_c, linetype = 2, color = "black", linewidth = 1.2) +
+  geom_vline(data = scores_c, aes(xintercept = stat, color = name), linetype = 1, linewidth = 1.2) +
+  scale_color_manual(values = cols_c_plot, name = NULL) +
+  labs(x = expression(bold("RAiSD " ~ mu ~ " statistic")), y = expression(bold(Count)), tag = "c") + # CHANGED to lowercase
+  coord_cartesian(ylim = c(0, mx_c * 1.05), clip = "off") +
+  theme_classic(base_size = 14) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+    axis.line = element_blank(),
+    axis.ticks = element_line(linewidth = 1.5, color = "black"),
+    panel.grid.major.y = element_line(color = "grey90", linetype = "dotted"),
+    legend.position = "none",
+    plot.margin = unit(c(0.2, 0.5, 0.2, 0.5), "cm"),
+    plot.tag = element_text(size = 20, face = "bold"),
+    axis.text.y = element_text(color="black", size=12, hjust=1, margin = margin(r = 2)),
+    axis.title.y = element_text(face="bold", margin = margin(r = 5)),
+    axis.ticks.length = unit(0.15, "cm")
+  )
+
+
+# ==============================================================================
+# Panel D: Fst histogram
+# ==============================================================================
+genes_d <- tibble(
+  name = c("CMT2", "FBX5", "VIM2/VIM4"),
+  chr = c("Chr4", "Chr2", "Chr1"),
+  pos = c(10420088, 18513626, 24586731)
+)
+
+df_d <- read_tsv(file_fst, show_col_types = FALSE) %>%
+  mutate(FST = as.numeric(WEIGHTED_FST), chr_n = as.numeric(gsub("Chr", "", CHROM))) %>%
+  filter(FST >= 0, !is.na(chr_n), !is.na(BIN_START))
+
+cands_d <- genes_d %>% rowwise() %>%
+  mutate(FST = df_d %>% filter(CHROM == chr, BIN_START <= pos, BIN_END >= pos) %>% pull(FST) %>% max(na.rm = TRUE),
+         # CHANGED: Force Factor Order for Legend in D
+         name = factor(name, levels = target_order))
+
+cut95_d <- quantile(df_d$FST, 0.95, na.rm = TRUE)
+ymax_d <- max(ggplot_build(ggplot(df_d, aes(FST)) + geom_histogram(bins = 50))$data[[1]]$count) * 1.05
+
+p_d <- ggplot(df_d, aes(FST)) +
+  geom_histogram(bins = 50, fill = "grey50", color = "black", alpha = 0.8) +
+  geom_vline(xintercept = cut95_d, linetype = 2, linewidth = 1.2) +
+  geom_vline(data = cands_d, aes(xintercept = FST, color = name), linetype = 1, linewidth = 1.2) +
+  scale_color_manual(values = cols_c_plot, name = NULL) +
+  labs(x = expression(bold(~F[ST])), y = expression(bold(Count)), tag = "d") + # CHANGED to lowercase
+  coord_cartesian(ylim = c(0, ymax_d), clip = "off") +
+  theme_classic(base_size = 14) +
+  theme(
+    panel.border = element_rect(fill = NA, linewidth = 1),
+    axis.line = element_blank(),
+    axis.ticks = element_line(linewidth = 1, color = "black"),
+    panel.grid.major.y = element_line(color = "grey90", linetype = "dotted"),
+    legend.position = "none",
+    plot.margin = unit(c(0.2, 0.5, 0.2, 0.5), "cm"),
+    plot.tag = element_text(size = 20, face = "bold"),
+    axis.text.y = element_text(color="black", size=12, hjust=1, margin = margin(r = 2)),
+    axis.title.y = element_text(face="bold", margin = margin(r = 5)),
+    axis.ticks.length = unit(0.15, "cm")
+  )
+
+
+# ==============================================================================
+# Panel E: Phenotypic Effects
+# ==============================================================================
+vars_e <- c("CMT2", "FBX5", "VIM2_4_DEL")
+cols_e <- c("Ancestral" = "#606060", "CMT2" = "navyblue", "FBX5" = "coral2", "VIM2/VIM4" = "palegreen4")
+
+df_e <- read.csv(file_pheno) %>%
+  select(SeqID, FRI, all_of(vars_e), FloweringDays, delta13C_31_Avg) %>%
+  pivot_longer(cols = all_of(vars_e), names_to = "Variant", values_to = "Genotype") %>%
+  filter(!is.na(Genotype), !is.na(FRI)) %>%
+  mutate(
+    Genotype = factor(Genotype, levels = c("Ancestral", "Derived")),
+    FRI = factor(FRI, levels = c("Ancestral", "Derived")),
+    Var_Lab = ifelse(Variant == "VIM2_4_DEL", "VIM2/VIM4", Variant),
+    # CHANGED: Force Factor Order for Panel E axis
+    Var_Lab = factor(Var_Lab, levels = target_order),
+    X_Lab = glue("{Var_Lab}<sub>{ifelse(Genotype=='Ancestral', 'Anc', 'Der')}</sub>"),
+    Col_Grp = ifelse(Genotype == "Ancestral", "Ancestral", as.character(Var_Lab))
+  )
+
+x_ord_e <- df_e %>%
+  arrange(Var_Lab, Genotype) %>%
+  distinct(X_Lab) %>%
+  pull(X_Lab)
+df_e$X_Lab <- factor(df_e$X_Lab, levels = x_ord_e)
+
+stats_ft <- df_e %>%
+  filter(!is.na(FloweringDays)) %>%
+  group_by(Variant, Var_Lab) %>%
+  summarise(
+    p = summary(lm(FloweringDays ~ Genotype + FRI))$coefficients["GenotypeDerived", 4],
+    y = max(FloweringDays) + diff(range(FloweringDays)) * 0.15,
+    group1 = X_Lab[Genotype == "Ancestral"][1],
+    group2 = X_Lab[Genotype == "Derived"][1],
+    .groups = "drop"
+  ) %>%
+  mutate(label = scales::pvalue(p, accuracy = 0.0001, add_p = TRUE))
+
+stats_wue <- df_e %>%
+  filter(!is.na(delta13C_31_Avg)) %>%
+  group_by(Variant, Var_Lab) %>%
+  summarise(
+    p = summary(lm(delta13C_31_Avg ~ Genotype))$coefficients["GenotypeDerived", 4],
+    y = max(delta13C_31_Avg) + diff(range(delta13C_31_Avg)) * 0.15,
+    group1 = X_Lab[Genotype == "Ancestral"][1],
+    group2 = X_Lab[Genotype == "Derived"][1],
+    .groups = "drop"
+  ) %>%
+  mutate(label = scales::pvalue(p, accuracy = 0.0001, add_p = TRUE))
+
+n_ft <- df_e %>%
+  filter(!is.na(FloweringDays)) %>%
+  count(X_Lab) %>%
+  mutate(lab = paste0("n=", n))
+n_wue <- df_e %>%
+  filter(!is.na(delta13C_31_Avg)) %>%
+  count(X_Lab) %>%
+  mutate(lab = paste0("n=", n))
+
+base_theme_e <- theme_classic(base_size = 9) + theme(
+  legend.position = "none",
+  axis.title.y = element_text(face = "bold", size = 12, margin = margin(r = 5)),
+  axis.text.y = element_text(size = 10, color = "black"),
+  axis.line = element_line(linewidth = 1.2),
+  axis.ticks = element_line(linewidth = 1.2),
+  axis.ticks.length = unit(0.2, "cm"),
+  panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5)
+)
+
+p_e1 <- ggplot(df_e %>% filter(!is.na(FloweringDays)), aes(X_Lab, FloweringDays, fill = Col_Grp)) +
+  geom_vline(xintercept = seq(2.5, length(x_ord_e) - 1.5, 2), color = "gray60", linewidth = 0.8) +
+  geom_jitter(aes(color = Col_Grp), width = 0.2, shape = 16, size = 2, alpha = 0.6) +
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "black", size = 0.8, fatten = 2.5) +
+  stat_pvalue_manual(stats_ft, label = "label", y.position = "y", tip.length = 0.01, size = 3) +
+  geom_text(data = n_ft, aes(X_Lab, -Inf, label = lab), vjust = -1.5, size = 3, inherit.aes = FALSE) +
+  scale_fill_manual(values = cols_e) +
+  scale_color_manual(values = cols_e) +
+  scale_y_continuous(expand = expansion(mult = c(0.15, 0.15))) +
+  labs(y = "Days to flowering", x = NULL, tag = "e") + # CHANGED to lowercase
+  base_theme_e +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x = element_blank(),
+    plot.margin = margin(t = 5.5, r = 5.5, b = -6, l = 5.5),
+    plot.tag = element_text(size = 20, face = "bold")
+  )
+
+p_e2 <- ggplot(df_e %>% filter(!is.na(delta13C_31_Avg)), aes(X_Lab, delta13C_31_Avg, fill = Col_Grp)) +
+  geom_vline(xintercept = seq(2.5, length(x_ord_e) - 1.5, 2), color = "gray60", linewidth = 0.8) +
+  geom_jitter(aes(color = Col_Grp), width = 0.2, shape = 16, size = 2, alpha = 0.6) +
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "black", size = 0.8, fatten = 2.5) +
+  stat_pvalue_manual(stats_wue, label = "label", y.position = "y", tip.length = 0.01, size = 3) +
+  geom_text(data = n_wue, aes(X_Lab, -Inf, label = lab), vjust = -1.5, size = 3, inherit.aes = FALSE) +
+  scale_fill_manual(values = cols_e) +
+  scale_color_manual(values = cols_e) +
+  scale_y_continuous(expand = expansion(mult = c(0.15, 0.15))) +
+  labs(y = expression(bold(paste("WUE (", delta^13, "C)"))), x = NULL) +
+  base_theme_e +
+  theme(
+    axis.text.x = element_markdown(angle = 45, hjust = 1, size = 9, face = "bold", color = "black"),
+    plot.margin = margin(t = -6, r = 5.5, b = 5.5, l = 5.5)
+  )
+
+
+# ==============================================================================
+# Final figure with all panels
+# ==============================================================================
+col_right <- plot_grid(p_e1, p_e2, ncol = 1, align = "v", rel_heights = c(1, 1.2))
+col_left <- plot_grid(p_c, p_d, ncol = 1, align = "v")
+bottom_row <- plot_grid(col_left, col_right, ncol = 2, rel_widths = c(1, 1))
+final_plot <- plot_grid(p_a, p_b, bottom_row, ncol = 1, rel_heights = c(1.5, 1, 2.5))
+
+# Save
+ggsave("Figure7.pdf", final_plot, width = 14, height = 16)
+```
+
+
+
+# Authors
 
 * **Johan Zicola** - [johanzi](https://github.com/johanzi)
 * **Emmanuel Tergemina** [EmmanuelTergemina](https://github.com/EmmanuelTergemina)
+* **Ahmed F Elfarargi**
 
 # License
 
