@@ -2,7 +2,7 @@ High impact mutations drive DNA methylation variation after colonization
 of a novel habitat
 ================
 Johan Zicola
-2025-11-03 14:43:00
+2026-04-08 16:53:09
 
 - [Overview](#overview)
 - [Softwares required](#softwares-required)
@@ -79,6 +79,7 @@ Johan Zicola
   - [Plot diagram VIM2](#plot-diagram-vim2)
   - [Plot diagram CMT2](#plot-diagram-cmt2)
   - [Plot diagram FBX5](#plot-diagram-fbx5)
+  - [Plot diagram all alleles](#plot-diagram-all-alleles)
 - [Plot gbM by VIM2/4 allele](#plot-gbm-by-vim24-allele)
 - [Plot TE methylation by FBX5
   allele](#plot-te-methylation-by-fbx5-allele)
@@ -247,29 +248,23 @@ Johan Zicola
     - [Analysis by CMT2 allele](#analysis-by-cmt2-allele)
     - [Analysis by FBX5 allele](#analysis-by-fbx5-allele)
     - [Permutation](#permutation)
-- [Analysis of presence/absence variation of
-  TEs](#analysis-of-presenceabsence-variation-of-tes)
-  - [Installation TEPID](#installation-tepid)
-  - [TE annotation used](#te-annotation-used)
-  - [Run TEPID](#run-tepid)
-  - [Summarize TEPID output](#summarize-tepid-output)
-  - [Analysis all TEs](#analysis-all-tes)
-    - [CMT2](#cmt2)
-    - [FBX5](#fbx5)
-  - [Analysis long TEs](#analysis-long-tes)
-    - [CMT2](#cmt2-1)
-    - [FBX5](#fbx5-1)
+- [TE transposition using read coverage as
+  proxy](#te-transposition-using-read-coverage-as-proxy)
+  - [CMT2](#cmt2)
+  - [FBX5](#fbx5)
 - [Marginal genealogical tree with
   RELATE](#marginal-genealogical-tree-with-relate)
   - [VIM2](#vim2)
-  - [CMT2](#cmt2-2)
-  - [FBX5](#fbx5-2)
+  - [CMT2](#cmt2-1)
+  - [FBX5](#fbx5-1)
 - [Inference of selection
   coefficient](#inference-of-selection-coefficient)
   - [VIM2](#vim2-1)
-  - [CMT2](#cmt2-3)
-  - [FBX5](#fbx5-3)
-- [Author](#author)
+  - [CMT2](#cmt2-2)
+  - [FBX5](#fbx5-2)
+- [Selective sweep analysis (figure
+  7)](#selective-sweep-analysis-figure-7)
+- [Authors](#authors)
 - [License](#license)
 
 # Overview
@@ -861,7 +856,7 @@ ggplot_all(df_mean_genes, title = title)
 ``` r
 require(gghighlight)
 
-df_accessions <- read.table("data/methylKit_files/df_accessions_1001_CPV_MOR.txt",
+df_accessions <- read.table("data/methylKit_files/1001GP/df_accessions_1001_CPV_MOR.txt",
                             header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
 
 path_DB <- "data/methylKit_files/1001GP"
@@ -932,7 +927,7 @@ ggplot(data=df_subset, aes(x=country_code, y=percent_methylation)) + geom_boxplo
   geom_jitter(data=df_subset[90,],size=2, fill="#d2d2d2ff", shape=21, width=0.1, height=0) +
   geom_jitter(data=df_subset[91,],size=2, fill="#d2d2d2ff", shape=21, width=0.1, height=0) +
   geom_jitter(data=df_subset[549,],size=0.5, fill="black", shape=21, width=0.1, height=0)+
-    geom_jitter(data=df_subset[625,],size=0.5, fill="black", shape=21, width=0.1, height=0)
+  geom_jitter(data=df_subset[625,],size=0.5, fill="black", shape=21, width=0.1, height=0)
 ```
 
 ![](images/figure1.png)
@@ -1053,7 +1048,7 @@ ggplot(data = df_subset, aes(x = country_code, y = percent_methylation)) +
   geom_jitter(data = df_subset[91, ], size = 2, fill = "#d2d2d2ff", shape = 21, width = 0.1, height = 0)
 ```
 
-![](images/mCHH_all_TEs_worldwide.png)
+![](images/mCG_all_TEs_worldwide.png)
 
 ### mCHG all TEs
 
@@ -2232,7 +2227,7 @@ rm summary_SnpEff_chr5_candidates.txt summary_SnpEff_chr5_candidates_freq.txt
 ```
 
 Import text file `summary_SnpEff_chr5_candidates_final.txt` in Excel
-(Data \> From Text \> Tab-separated) =\> Supplementary Table 11
+(Data \> From Text \> Tab-separated) =\> Supplementary Table 11.
 
 # Allele status in CPV
 
@@ -2279,7 +2274,6 @@ awk '$2 == "1" {print $0}' Chr2_18513626_GQ25_DP3.melted.vcf | wc -l
 awk '$2 == "1" {print $0}' Chr2_18513626_GQ25_DP3.melted.vcf | cut -f1 | sort - > FBX5_alt.txt
 awk '$2 == "0" {print $0}' Chr2_18513626_GQ25_DP3.melted.vcf | cut -f1 | sort - > FBX5_ref.txt
 
-
 awk -v OFS='\t' '{print $0,"FBX5_alt"}' FBX5_alt.txt > FBX5_alt_final.txt
 awk -v OFS='\t' '{print $0,"FBX5_ref"}' FBX5_ref.txt > FBX5_ref_final.txt
 
@@ -2313,7 +2307,6 @@ cat CMT2_alt_final.txt CMT2_ref_final.txt > CMT2_allele_status.txt
 
 rm CMT2_alt.txt CMT2_ref.txt CMT2_alt_final.txt CMT2_ref_final.txt 
 
-
 #################################################################
 # VIM2 deletion
 #################################################################
@@ -2338,6 +2331,8 @@ cut -f2 nb_reads_vim2_deletion.txt | sort -n -
 # Let's use 50 reads as the threshold to define that there is indeed a deletion
 
 # Classify each sample based on nb of reads with threshold = 50
+# If a given accession has 50 or less reads mapping at the promoter region of VIM2-VIM4, the accession is considered
+# as having the VIM2 deletion.
 awk -v OFS="\t" '$2 <= 50 {print $1,$2,"deletion"} $2 > 50 {print $1,$2,"no_deletion"}' nb_reads_vim2_deletion.txt > nb_reads_vim2_deletion_status.txt
 
 #################################################################
@@ -2358,7 +2353,6 @@ awk '$2 == "1" {print $0}' Chr5_15047549_GQ25_DP3.melted.vcf | wc -l
 
 awk '$2 == "1" {print $0}' Chr5_15047549_GQ25_DP3.melted.vcf | cut -f1 | sort - > VIM3_alt.txt
 awk '$2 == "0" {print $0}' Chr5_15047549_GQ25_DP3.melted.vcf | cut -f1 | sort - > VIM3_ref.txt
-
 
 awk -v OFS='\t' '{print $0,"VIM3_alt"}' VIM3_alt.txt > VIM3_alt_final.txt
 awk -v OFS='\t' '{print $0,"VIM3_ref"}' VIM3_ref.txt > VIM3_ref_final.txt
@@ -2508,6 +2502,14 @@ df_coordinates <- read.table("data/coord_populations_SA.txt", header=TRUE)
 names(df_coordinates) <- c("population","long","lat")
 ```
 
+``` r
+# Take coordinates from Supp Table 1 from Fulgione 2022
+# Remove duplicates by pop and keep one of the two S24 coordinates
+
+df_coordinates <- read.table("data/coord_populations_SA.txt", header=TRUE)
+names(df_coordinates) <- c("population","long","lat")
+```
+
 ## VIM2 distribution
 
 ``` r
@@ -2537,7 +2539,10 @@ ggplot(SA, aes(long, lat)) +
   labs(fill = "VIM2 alleles") +
   scale_fill_manual(values = c("coral2", "turquoise4")) +
   theme(axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16)) +
-  geom_scatterpie_legend(df_vim2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005)
+  geom_scatterpie_legend(df_vim2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005) +  theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black")) + 
+      theme(plot.title = element_text(hjust = 0.5))
 ```
 
 ![](images/VIM2_allele_map.png)
@@ -2567,9 +2572,12 @@ ggplot(SA, aes(long, lat)) +
   ylab("Latitude") +
   geom_scatterpie(aes(x = long, y = lat, r = radius, group = population), data = df_cmt2_coord, cols = c("freq_derived","freq_ancestral"), sorted_by_radius = TRUE, alpha = .5) +
   labs(fill = "CMT2 alleles") +
-  scale_fill_manual(values = c("turquoise4", "coral2")) +
+  scale_fill_manual(values = c("coral2","turquoise4")) +
   theme(axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16)) +
-  geom_scatterpie_legend(df_cmt2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005)
+  geom_scatterpie_legend(df_cmt2_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005) +  theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black")) + 
+      theme(plot.title = element_text(hjust = 0.5)) 
 ```
 
 ![](images/CMT2_allele_map.png)
@@ -2601,7 +2609,10 @@ ggplot(SA, aes(long, lat)) +
   labs(fill = "FBX5 alleles") +
   scale_fill_manual(values = c("coral2","turquoise4")) +
   theme(axis.title.x = element_text(size = 16), axis.title.y = element_text(size = 16)) +
-  geom_scatterpie_legend(df_fbx5_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005)
+  geom_scatterpie_legend(df_fbx5_coord$radius, x = -25.03, y = 17.124, n = 4, labeller = function(x) 10 * x / 0.005) +  theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black")) + 
+      theme(plot.title = element_text(hjust = 0.5)) 
 ```
 
 ![](images/FBX5_allele_map.png)
@@ -2678,6 +2689,80 @@ ggplot(data = df, aes(population_nb, freq_derived)) +
 ```
 
 ![](images/FBX5_deletion_frequency.png)
+
+## Plot diagram all alleles
+
+``` r
+############# VIM2
+
+# Create new variable which concatenat population name and number of accessions
+df_vim2_coord$population_nb <- paste(df_vim2_coord$population, " n=", df_vim2_coord$total, sep="")
+
+# Remove Cvi
+df_vim2 <- df_vim2_coord[!(df_vim2_coord$population=="Cvi"),]
+
+# Order accession by longitude
+df_vim2$population <- factor(df_vim2$population, levels = df_vim2$population[order(df_vim2$long)])
+df_vim2$population_nb <- factor(df_vim2$population_nb, levels = df_vim2$population_nb[order(df_vim2$long)])
+
+df_vim2$allele <- as.factor("VIM2")
+
+############# CMT2
+
+# Remove Cvi
+df_cmt2 <- df_cmt2_coord[!(df_cmt2_coord$population=="Cvi"),]
+
+# Order accession by longitude
+df_cmt2$population <- factor(df_cmt2$population, levels = df_cmt2$population[order(df_cmt2$long)])
+df_cmt2$population_nb <- factor(df_cmt2$population_nb, levels = df_cmt2$population_nb[order(df_cmt2$long)])
+
+df_cmt2$allele <- as.factor("CMT2")
+
+############ FBX5
+
+# Remove Cvi
+df_fbx5 <- df_fbx5_coord[!(df_fbx5_coord$population=="Cvi"),]
+
+# Order accession by longitude
+df_fbx5$population <- factor(df_fbx5$population, levels = df_fbx5$population[order(df_fbx5$long)])
+df_fbx5$population_nb <- factor(df_fbx5$population_nb, levels = df_fbx5$population_nb[order(df_fbx5$long)])
+
+df_fbx5$allele <- as.factor("FBX5")
+
+df_all_alleles <- rbind(df_vim2, df_cmt2, df_fbx5)
+
+
+#
+
+df_cmt2_coord$population_nb <- paste(df_cmt2_coord$population, " n=", df_cmt2_coord$total, sep="")
+
+# Remove Cvi
+df <- df_cmt2_coord[!(df_cmt2_coord$population=="Cvi"),]
+
+# Order accesstion by longitude
+df$population_nb <- factor(df$population_nb, levels = df$population_nb[order(df$long)], ordered=TRUE)
+
+
+
+########## Plot
+
+# Colorblind-friendly palette
+col <- c("#7570b3","#1b9e77","#d95f02")
+
+ggplot(data = df_all_alleles, aes(population_nb, freq_derived)) +
+  ggtitle("Derived allele frequencies per population") +
+  geom_bar(aes(x = population_nb, y = freq_derived, fill=allele), position="dodge", stat = "identity") + 
+  theme_bw() + scale_fill_manual(values=col) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ylab("Derived allele frequency") +
+  xlab("Population") +
+  scale_y_continuous(labels = scales::percent) +  theme(axis.text.x = element_text(color="black"), 
+      axis.text.y = element_text(color="black"),
+      axis.ticks = element_line(color = "black"))
+```
+
+![](images/deletion_frequency_all_alleles.png)
 
 # Plot gbM by VIM2/4 allele
 
@@ -6095,7 +6180,7 @@ coldata[,col_names] <- lapply(coldata[,col_names] , factor)
 cts <- readRDS("data/cts_TEs.Rds")
 # Add population in coldata
 
-# Create a population variable by spliting sample
+## Create a population variable by splitting sample
 #coldata_pop <- coldata %>% separate(sample, c("population","second","third"), "_") %>% dplyr::select(population)
 
 #coldata$population <- coldata_pop$population
@@ -6540,342 +6625,132 @@ grid.arrange(p1, p2, nrow = 1)
 Observed values (horizontal red lines) are above the permutation
 distribution.
 
-# Analysis of presence/absence variation of TEs
+# TE transposition using read coverage as proxy
 
-Going through the literature, several methods are used to look for TE
-presence/absence variation (PAV) based on paired-end sequencing. The two
-most recent methods I found are TE-Tracker [Gilly et al
-2014](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-014-0377-z)
-and TEPID [Stuart et al 2016](https://elifesciences.org/articles/20777).
-It seems the documentation is more complete for TEPID and the method was
-used in a recent paper on *Capsella rubella* ([Niu et al
-2019](https://doi.org/10.1073/pnas.1811498116)).
-
-## Installation TEPID
-
-I fixed some bugs in the TEPID but not all my changes we integrated in
-the original github repository (<https://github.com/ListerLab/TEPID>). I
-recommend therefore to download the version I forked on my GitHub
-account (<https://github.com/johanzi/TEPID>).
-
-Get started:
+Map reads to the TAIR10 TE annotation allowing two mismatches (default
+bowtie) and look at the reads per millions for each accessions
 
 ``` bash
-# Check doc on github: https://github.com/ListerLab/TEPID
+# Raw reads
+/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq
 
-cd ~/SCRIPTS
-git clone git@github.com:johanzi/TEPID.git
+ ~/bin/seqkit stats 4073_L_R1.fastq.gz
+file                format  type    num_seqs        sum_len  min_len  avg_len  max_len
+4073_L_R1.fastq.gz  FASTQ   DNA   10,566,430  1,590,859,487       15    150.6      151
 
-cd ./TEPID
-pip install -r requirements.txt --user
+# Data have been trimmed already
 
-# Problem with installing pysam, rerun from build-server => seems to work
-python setup.py install --user
-```
+# TE annotation (31189)
 
-Seems to work. I need to install Yaha
+~/bin/seqkit stats /home/zicola/TAIR10_annotations/TAIR10_TE.fas
+file           format  type  num_seqs     sum_len  min_len  avg_len  max_len
+TAIR10_TE.fas  FASTA   DNA     31,189  23,315,940       10    747.6   31,019
 
-``` bash
-git clone https://github.com/GregoryFaust/yaha.git
+/home/zicola/TAIR10_annotations/TAIR10_Transposable_Elements_EvaFormat.bed
 
-cd yaha
+# Get only overlapping
 
-make # not working
-# Check solution on https://github.com/GregoryFaust/yaha/issues/2
-# Edit Makefile file and change CPPFLAGS := $(CCFLAGS) into
-# CPPFLAGS := $(CCFLAGS) -fpermissive
+cd /srv/netscratch/irg/grp_hancock/johan/TE_mapping
 
-make # Working
-# Add /home/zicola/SCRIPTS/yaha/bin to $PATH 
-```
+cp /home/zicola/TAIR10_annotations/TAIR10_TE.fas .
 
-Create Yaha index. They don’t give parameters for indexing
-<https://elifesciences.org/articles/20777> so I use the default ones: -H
-(max-Hits) 65525, -L (seed-Length) 15, -S (Skip-distance) 1
+bowtie-build -f TAIR10_TE.fas TAIR10_TE
 
-``` bash
-cd /home/zicola/TAIR10_Chr_no_Pt_Mt
+index="/srv/netscratch/irg/grp_hancock/johan/TE_mapping/TAIR10_TE"
 
-mkdir yaha_index
+while read i; do
+if [ -e /srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq/${i}_R1.fastq.gz ]; then
+  echo "$i present"
+else
+  echo "$i ABSENT!!!!!!!!!!!!!!!!!!"
+fi
+done < list_accessions.txt
 
-cd yaha_index
+# OK, all present
 
-yaha -g TAIR10.fa
+path_fastq="/srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq"
+index="/srv/netscratch/irg/grp_hancock/johan/TE_mapping/TAIR10_TE"
 
-YAHA version 0.1.83
-Compressing TAIR10.fa into TAIR10.nib2.
-Finished compressing TAIR10.nib2, now forming index.
-Creating index file TAIR10.X15_01_65525S.
-Randomly Sampling hits for 15-mers that occur more than 65525 times in the refer                                                          ence.
-0 15-mers had more than 65525 hits.
-Index TAIR10.X15_01_65525S created.
-Operation on TAIR10.nib2 used 1M22S(82.368S) User, 22.060S System, Total: 1M44S(104.428S) in 2M28S(148S) wall time.
+while read i; do
+  bowtie --threads 6 $index -S -1 ${path_fastq}/${i}_R1.fastq.gz -2 ${path_fastq}/${i}_R2.fastq.gz  |  samtools sort | samtools view -bS -F4 -o mapped_TEs/${i}.bam
+done < test
 
-# Created 2 files in parent directory. Move them back to yaha_index/
-TAIR10.nib2
-TAIR10.X15_01_65525S
-```
+# reads processed: 22195073
+# reads with at least one reported alignment: 58166 (0.26%)
+# reads that failed to align: 22136907 (99.74%)
 
-Create bowtie2 index
 
-``` bash
-cd /home/zicola/TAIR10_Chr_no_Pt_Mt
+# Many error message "Warning: Exhausted best-first chunk memory for read ..."
+# Seem to be due to limited memoru
+# https://www.seqanswers.com/forum/bioinformatics/bioinformatics-aa/13897-bowtie-memory-warning
+# Recommend using option --chunkmbs 200
 
-bowtie2-build -f TAIR10.fa TAIR10_bowtie2
+# http://dell-head.mpipz.mpg.de/ganglia/?c=DC_Cluster&h=clusternode2.cluster.local&m=load_one&r=hour&s=by%20name&hc=4&mc=2
+# Indicates there is plenty of mem on dell-node-2 (up to 280 Gb)
 
-# Move created file in bowtie2_index/
-```
-
-I now have bowtie2 and yaha indexes to run TEPID pipeline
-
-## TE annotation used
-
-The TAIR9 TE annotation (provided by TEPID in
-`TEPID/Annotation/Arabidopsis/TAIR9_TE.bed.gz`) seems similar to
-Araport11 (same number of features, positions of ATCOPIA24 similar).
-
-Make sure the chromosome name in the TE bed file and the genome fasta
-files are the same (for instance chr or Chr). If needed changed bed file
-to fit the fasta file chromosome name system
-
-``` bash
-cd TEPID/Annotation/Arabidopsis/
-
-gunzip TAIR9_TE.bed.gz
-
-# Put C in uppercase to match TAIR10 fasta file 
-sed -i 's/chr/Chr/g' TAIR9_TE.bed 
-```
-
-Check insert size of the paired-end reads (use Python script
-getinsertsize.py available in gist
-<https://gist.github.com/davidliwei/2323462>)
-
-``` bash
-
-# Get python script getinsertsize.py
-cd ~/SCRIPTS
-
-wget https://gist.githubusercontent.com/davidliwei/2323462/raw/66a91787bd76a7ca0eee31aab20284295b0fb46b/getinsertsize.py
-
-# Go to mapped reads
-cd /srv/netscratch/dep_coupland/grp_hancock/mappedBAM/CVI
-
-samtools view 2876_AL_S1-1.sorted.bam | head -n 10000 |  python ~/SCRIPTS/getinsertsize.py -
-
-Read length: mean 150.927854454, STD=1.71195688463
-Read span: mean 343.815380698, STD=89.0161271871
-```
-
-The average insert size in this bam file is 343 bp.
-
-## Run TEPID
-
-Create a wrap up bash script `run_tepid.sh` that takes as input unmapped
-bam files containing both read1 and read2:
-
-``` bash
-
-run_tepid(){
-
-  # Path to Yaha index
-  yaha_index="/home/zicola/TAIR10_Chr_no_Pt_Mt/yaha_index/TAIR10.X15_01_65525S"
-  
-  # Bowtie2 index path needs to include the prefix of the index
-  bowtie2_index="/home/zicola/TAIR10_Chr_no_Pt_Mt/bowtie2_index/TAIR10_bowtie2"
-  
-  # TE index
-  TE_bed="/srv/netscratch/dep_coupland/grp_hancock/johan/tepid_pipeline/TAIR9_TE.bed"
-  
-  # Bam file to convert into fastq files
-  i=$1
-  
-  # Check if all variables exists
-  if [ ! -e $yaha_index ]; then
-    echo "File $yaha_index does not exist"
-    exit 1
-  elif [ ! -e ${bowtie2_index}.1.bt2 ]; then
-    echo "File ${bowtie2_index}.1.bt2 does not exist. Bowtie2 indexes not properly created."
-    exit 1
-  elif [ ! -e $TE_bed ]; then
-    echo "File $TE_bed does not exist"
-    exit 1
-  elif [ ! -d $bam_path ]; then
-    echo "Directory $TE_bed does not exist"
-    exit 1
+while read i; do
+  if [ -e mapped_TEs/${i}.bam ]; then
+    echo "mapped_TEs/${i}.bam already exists"
+  else
+    bowtie --threads 6 --chunkmbs 200  $index -S -1 ${path_fastq}/${i}_R1.fastq.gz -2 ${path_fastq}/${i}_R2.fastq.gz  |  samtools sort | samtools     view -bS -F4 -o mapped_TEs/${i}.bam
   fi
-
-  echo -e "\n#################CONVERSION BAM TO FASTQ####################\n"
-
-  echo -e $i 'is processed\n'
-
-  start=$(date +%s)
-
-  # Create fastq files 1 and 2
-  name=$(basename $i | cut -d'_' -f1)
-
-  # Skip the sample 12851 (already done)
-  if [ $name == "12851" ]; then
-    continue
-  fi
-
-  echo -e "samtools sort -n $i | bedtools bamtofastq -i - -fq ${name}.end1.fq -fq2 ${name}.end2.fq\n"
-  samtools sort -n $i | bedtools bamtofastq -i - -fq ${name}.end1.fq -fq2 ${name}.end2.fq
-
-  # Check if the 2 fastq files were generated properly before continuing
-  if [ ! -e ${name}.end1.fq ] || [ ! -e ${name}.end2.fq ]; then
-    echo "File ${name}.end1.fq and/or ${name}.end2.fq do not exist"
-    exit 1
-  fi
-
-  # Perform tepid-map step
-  echo -e "\n#################TEPID-MAP####################\n"
-
-  echo -e "~/SCRIPTS/TEPID/build/scripts-2.7/tepid-map -x $bowtie2_index -y $yaha_index -p 6 -s 200 -n ${name} -1 ${name}.end1.fq -2 ${name}.end2.fq\n"
-  ~/SCRIPTS/TEPID/build/scripts-2.7/tepid-map -x $bowtie2_index -y $yaha_index -p 6 -s 200  -n ${name} -1 ${name}.end1.fq -2 ${name}.end2.fq
-
-  # Check if bam and split.bam files were created
-  if [ ! -e ${name}.bam ]; then
-    echo "File ${name}.bam does not exist"
-    exit 1
-  elif [ ! -e ${name}.split.bam ]; then
-    echo "File ${name}.split.bam does not exist"
-    exit 1
-  fi
-
-  # Get rid of umap.fastq which is not removed by tepid-map. Not needed afterward
-  echo -e "rm ${name}.umap.fastq\n"
-  rm ${name}.umap.fastq
-
-  # Perform tepid-discover step
-  echo -e "\n#################TEPID-DISCOVER####################\n"
-  
-  echo -e "~/SCRIPTS/TEPID/build/scripts-2.7/tepid-discover --name $name --te $TE_bed --keep --conc ${name}.bam --split ${name}.split.bam\n"
-  ~/SCRIPTS/TEPID/build/scripts-2.7/tepid-discover --name $name --te $TE_bed --conc ${name}.bam --split ${name}.split.bam
-
-  # Remove fastq files
-  echo -e "rm ${name}.end1.fq ${name}.end2.fq"
-  rm ${name}.end1.fq ${name}.end2.fq
-
-  # Remove bam files
-  echo -e "rm ${name}.split.bam ${name}.bam ${name}.bam.bai"
-  rm ${name}.split.bam ${name}.bam ${name}.bam.bai
-
-  end=$(date +%s)
-  runtime=$((end-start))
-
-  echo -e "Sample $name processed. Run time: $runtime \n"
-
-  echo -e "\n######################END########################\n"
-}
-
-"$@"
+done < list_accessions.txt
 ```
 
-Launch the pipeline for all CVI. Here I use the job manager LSF. Adapt
-script to your HPC manager if different (e.g. SLURM). I allocated 20
-CPUs and 12Gb of RAM per job.
-
-``` bash
-bam_path="/srv/biodata/dep_coupland/grp_hancock/rawData/CVI"
-
-for i in ${bam_path}/*bam; do
-    bsub -q multicore20 -n 20 -R "span[hosts=1] rusage[mem=10000]" -M 12000 "run_tepid.sh run_tepid $i"
-done
-```
-
-Each run generates 5 files:
-
-    \ls -1 *15673*
-    ../deletion_reads_15673.txt
-    ../deletions_15673.bed
-    ../insertion_reads_15673.txt
-    ../insertions_15673.bed
-    ../tepid_discover_log_15673.txt
-
-## Summarize TEPID output
+Summarize mapping statistics
 
 ``` bash
 
-cd /srv/netscratch/irg/grp_hancock/johan/tepid_pipeline/CPV_fastq/all_CPV
+cd /srv/netscratch/irg/grp_hancock/johan/TE_mapping/mapped_TEs
 
-echo -e "seqID\tnb_deletions\tnb_insertions" >> summary_indel.txt
-
-for i in tepid_discover_log_*txt; do
-  seqID=$(echo $i | cut -d'_' -f4- | cut -d'.' -f1)
-    nb_insertions=$(wc -l insertions_${seqID}.bed | cut -d' ' -f1 -)
-    nb_deletions=$(wc -l deletions_${seqID}.bed | cut -d' ' -f1 -)  
-    echo -e "${seqID}\t${nb_deletions}\t${nb_insertions}"
-done >> summary_indel.txt
-
-for i in tepid_discover_log_*txt; do
-  seqID=$(echo $i | cut -d'_' -f4- | cut -d'.' -f1)
-    coverage=$(sed -n 5p $i | cut -d' ' -f3)
-    insert_size=$(sed -n 4p $i | cut -d' ' -f5)
-    sd_insert_size=$(sed -n 4p $i | cut -d' ' -f10)
-    read_length=$(sed -n 6p $i | cut -d' ' -f4)
-    echo -e "${seqID}\t${insert_size}\t${sd_insert_size}\t${coverage}\t${read_length}"
-done >> summary_tepid_stats.txt
-
-# Keep only SA which are in the clean set (190 accessions)
-grep -w -f list_190_seqid.txt summary_indel.txt > summary_indel_clean.txt
-grep -w -f list_190_seqid.txt summary_tepid_stats.txt > summary_tepid_stats_clean.txt
-
-paste summary_tepid_stats_clean.txt summary_indel_clean.txt | cut -f1,2,3,4,5,7,8 > TE_indel_TEPID.txt
-
-# Add headers
-sed -i '1 i\seqID\tinsert_size\tsd_insert_size\tcoverage\tread_length\tnb_deletions\tnb_insertions' TE_indel_TEPID.txt
-```
-
-Extract values for long TEs only:
-
-``` bash
-
-bed_TEs_4kb="data/bed_files/Araport11_GFF3_transposons_longer_4kb.bed"
-
-wc -l $bed_TEs_4kb
-1235 Araport11_GFF3_transposons_longer_4kb.bed
-
-cd /srv/netscratch/irg/grp_hancock/johan/tepid_pipeline/CPV_fastq/all_CPV/long_TEs
-
-# Names of long TEs
-cut -f4 $bed_TEs_4kb > TE_ID_long_TEs.txt
-
-# Now get for each accessions the ins/del related to these TEs
-for i in ../insertion*bed; do
-  grep -f TE_ID_long_TEs.txt $i > ${i%.*}_long_TEs.txt
+for i in *bam; do
+  reads=$(samtools flagstat $i | head -n1 | cut -d' ' -f1)
+  echo -e "${i%%.*}\t$reads" >> summary_TE_mapping.txt
 done
 
-for i in ../deletion*bed; do
-  grep -f TE_ID_long_TEs.txt $i > ${i%.*}_long_TEs.txt
-done
+sort -k1 summary_TE_mapping.txt > summary_TE_mapping.sorted.txt
 
-# Summarize values
-for i in deletions*; do
-  seqID=$(echo "$i" |  sed 's/deletions_//' | sed 's/_long_TEs.txt//')
-  count_deletion=$(wc -l $i  | cut -d' ' -f1)
-  count_insertion=$(wc -l deletions_${name}_long_TEs.txt  | cut -d' ' -f1)
-  printf "$name\t$count_deletion\t$count_insertion\n" >> TE_indel_TEPID_long_TEs.txt
-done
+# Get total reads
 
-sed -i '1 i\seqID\tnb_deletions\tnb_insertions' TE_indel_TEPID_long_TEs.txt
+cd /srv/netscratch/irg/grp_hancock/johan/TE_mapping
+cd /srv/netscratch/irg/grp_hancock/raw_CVI_MAD_fastq
 
-paste TE_indel_TEPID.txt TE_indel_TEPID_long_TEs.txt > TE_indel_TEPID_all.txt
+while read i; do
+  seqkit stats -T ${i}_R1.fastq.gz >> summary.txt
+done < list_accessions.txt
 
-mv TE_indel_TEPID_all.txt TE_indel_TEPID.txt
+grep -v "file" summary.txt | cut -f1, 4 > summary_read_count.txt
+
+sed -i 's/_R1.fastq.gz//g' summary_read_count.txt
+
+sort -k1 summary_read_count.txt > summary_read_count.sorted.txt
+
+paste summary_read_count.sorted.txt summary_TE_mapping.sorted.txt | cut -f1,2,4 > summary_read_count_and_TEs.sorted.txt
 ```
 
-Import this file in Excel and merge with the genotyping call for VIM2,
-CMT2, and FBX5 (supplementary table X) also put in text file
-`data/TE_indel_TEPID.txt`.
+Combine total read with TE-mapped read count
+
+``` bash
+cut -f2 summary_TE_mapping.txt > TE_readcount
+paste summary_read_count.txt TE_readcount > summary_read_count_total_and_TEs.txt
+```
 
 ``` r
-df_TE_SA <- read.delim("data/TE_indel_TEPID.txt")
+allele_id <- read.delim("data/tepid/allele_id.txt")
 
-factors <- names(df_TE_SA)[c(1,2,3,8,9,10)]
-df_TE_SA <-  df_TE_SA %>% mutate_at(factors, as.factor)
+df_TE_count <- read.delim("data/summary_read_count_and_TEs.sorted.txt", header=FALSE)
 
-# Functions to plot number of TE insertions and deletions
+names(df_TE_count) <- c("seqID", "total_reads","TE_reads")
+df_TE_count$seqID <- as.factor(df_TE_count$seqID)
+
+df_TE_count$ratio_TE <- df_TE_count$TE_reads/df_TE_count$total_reads
+
+df_TE_count_allele <-  merge(df_TE_count, allele_id, by="seqID")
+
+df_TE_count_allele$FBX5 <- as.factor(df_TE_count_allele$FBX5)
+df_TE_count_allele$CMT2 <- as.factor(df_TE_count_allele$CMT2)
+
+# Plot nb of reads
 TE_plot_per_allele <- function(df, type, group){
   
   require(ggplot2)
@@ -6890,546 +6765,104 @@ TE_plot_per_allele <- function(df, type, group){
   
   ggplot(data=df_clean, aes_string(x=group, y=type, group=group))+
     geom_boxplot(outlier.shape = NA) +
-    geom_jitter() +
+    geom_jitter(data=df_clean[-190, ], size=1, width=0.2) +
+    geom_point(data=df_clean[190,], size=2, fill="red", shape=23, width=0.2) +
     ggtitle(paste(type," for ",group, sep="")) + 
-    theme_bw() +
+    theme_bw() + ylab("% reads mapping to TEs") + xlab("") +
     stat_summary(fun.data = give.n, geom = "text") +
     theme(axis.text.x = element_text(color="black"), 
       axis.text.y = element_text(color="black"),
       axis.ticks = element_line(color = "black")) + 
       theme(plot.title = element_text(hjust = 0.5)) + 
-      scale_y_continuous(labels = scales::comma_format())
+      scale_y_continuous(labels = scales::percent_format())
 }
 ```
 
-## Analysis all TEs
-
 ### CMT2
 
-#### Transpositions
-
 ``` r
-df_TE_SA$TE_transpositions <- df_TE_SA$TE_deletions + df_TE_SA$TE_insertions
-
-TE_plot_per_allele(df_TE_SA, "TE_transpositions","CMT2")
+TE_plot_per_allele(df_TE_count_allele, "ratio_TE","CMT2")
 ```
 
-![](images/TE_transpositions_CMT2.png)
+![](images/TE_mapping_WGS_CMT2.png)
 
 ``` r
 # Libraries for Welch test
 require(onewaytests)
 
 # Normality
-lm <- aov(TE_transpositions~CMT2, data=df_TE_SA)
+lm <- aov(ratio_TE~CMT2, data=df_TE_count_allele)
 lm.stdres <- rstandard(lm)
 shapiro.test(lm.stdres)
+# Nope
 
 # Homoscedasticity
-bartlett.test(TE_transpositions~CMT2, df_TE_SA)
+bartlett.test(ratio_TE~CMT2, df_TE_count_allele)
+# Yep
 
-wilcox.test(df_TE_SA$TE_transpositions[df_TE_SA$CMT2==0], df_TE_SA$TE_transpositions[df_TE_SA$CMT2==1], alternative = "two.sided")
+wilcox.test(df_TE_count_allele$ratio_TE[df_TE_count_allele$CMT2==0], df_TE_count_allele$ratio_TE[df_TE_count_allele$CMT2==1], alternative = "two.sided")
 ```
 
         Shapiro-Wilk normality test
 
     data:  lm.stdres
-    W = 0.96969, p-value = 0.0003891
+    W = 0.88789, p-value = 9.953e-11
 
 
         Bartlett test of homogeneity of variances
 
-    data:  TE_transpositions by CMT2
-    Bartlett's K-squared = 4.3466, df = 1, p-value = 0.03708
+    data:  ratio_TE by CMT2
+    Bartlett's K-squared = 2.1333, df = 1, p-value = 0.1441
 
 
         Wilcoxon rank sum test with continuity correction
 
-    data:  df_TE_SA$TE_transpositions[df_TE_SA$CMT2 == 0] and df_TE_SA$TE_transpositions[df_TE_SA$CMT2 == 1]
-    W = 4036, p-value = 0.7006
-    alternative hypothesis: true location shift is not equal to 0
-
-#### Deletions
-
-``` r
-TE_plot_per_allele(df_TE_SA, "TE_deletions","CMT2")
-```
-
-![](images/TE_deletions_CMT2.png)
-
-``` r
-# Libraries for Welch test
-require(onewaytests)
-
-# Normality
-lm <- aov(TE_deletions~CMT2, data=df_TE_SA)
-lm.stdres <- rstandard(lm)
-shapiro.test(lm.stdres)
-
-# Homoscedasticity
-bartlett.test(TE_deletions~CMT2, df_TE_SA)
-
-wilcox.test(df_TE_SA$TE_deletions[df_TE_SA$CMT2==0], df_TE_SA$TE_deletions[df_TE_SA$CMT2==1], alternative = "two.sided")
-```
-
-    Shapiro-Wilk normality test
-
-    data:  lm.stdres
-    W = 0.95634, p-value = 1.347e-05
-
-
-        Bartlett test of homogeneity of variances
-
-    data:  TE_deletions by CMT2
-    Bartlett's K-squared = 9.9726, df = 1, p-value = 0.001589
-
-
-        Wilcoxon rank sum test with continuity correction
-
-    data:  df_TE_SA$TE_deletions[df_TE_SA$CMT2 == 0] and df_TE_SA$TE_deletions[df_TE_SA$CMT2 == 1]
-    W = 4176, p-value = 0.4343
-    alternative hypothesis: true location shift is not equal to 0
-
-No significant differences
-
-#### Insertions
-
-``` r
-TE_plot_per_allele(df_TE_SA, "TE_insertions","CMT2")
-```
-
-![](images/TE_insertions_CMT2.png)
-
-``` r
-# Libraries for Welch test
-require(onewaytests)
-
-# Normality
-lm <- aov(TE_insertions~CMT2, data=df_TE_SA)
-lm.stdres <- rstandard(lm)
-shapiro.test(lm.stdres)
-
-# Homoscedasticity
-bartlett.test(TE_insertions~CMT2, df_TE_SA)
-
-wilcox.test(df_TE_SA$TE_insertions[df_TE_SA$CMT2==0], df_TE_SA$TE_insertions[df_TE_SA$CMT2==1], alternative = "two.sided")
-```
-
-    Shapiro-Wilk normality test
-
-    data:  lm.stdres
-    W = 0.93135, p-value = 8.173e-08
-
-
-        Bartlett test of homogeneity of variances
-
-    data:  TE_insertions by CMT2
-    Bartlett's K-squared = 3.8974, df = 1, p-value = 0.04836
-
-
-        Wilcoxon rank sum test with continuity correction
-
-    data:  df_TE_SA$TE_insertions[df_TE_SA$CMT2 == 0] and df_TE_SA$TE_insertions[df_TE_SA$CMT2 == 1]
-    W = 3670, p-value = 0.5148
+    data:  df_TE_count_allele$ratio_TE[df_TE_count_allele$CMT2 == 0] and df_TE_count_allele$ratio_TE[df_TE_count_allele$CMT2 == 1]
+    W = 2894, p-value = 0.004321
     alternative hypothesis: true location shift is not equal to 0
 
 ### FBX5
 
-#### Transpositions
-
 ``` r
-df_TE_SA$TE_transpositions <- df_TE_SA$TE_deletions + df_TE_SA$TE_insertions
-
-TE_plot_per_allele(df_TE_SA, "TE_transpositions","FBX5")
+TE_plot_per_allele(df_TE_count_allele, "ratio_TE","FBX5")
 ```
 
-![](images/TE_transpositions_FBX5.png)
+![](images/TE_mapping_WGS_FBX5.png)
 
 ``` r
 # Libraries for Welch test
 require(onewaytests)
 
 # Normality
-lm <- aov(TE_transpositions~FBX5, data=df_TE_SA)
+lm <- aov(ratio_TE~FBX5, data=df_TE_count_allele)
 lm.stdres <- rstandard(lm)
 shapiro.test(lm.stdres)
+# Nope
 
 # Homoscedasticity
-bartlett.test(TE_transpositions~FBX5, df_TE_SA)
+bartlett.test(ratio_TE~FBX5, df_TE_count_allele)
+# Yep
 
-wilcox.test(df_TE_SA$TE_transpositions[df_TE_SA$FBX5==0], df_TE_SA$TE_transpositions[df_TE_SA$FBX5==1], alternative = "two.sided")
+wilcox.test(df_TE_count_allele$ratio_TE[df_TE_count_allele$FBX5==0], df_TE_count_allele$ratio_TE[df_TE_count_allele$FBX5==1], alternative = "two.sided")
 ```
 
         Shapiro-Wilk normality test
 
     data:  lm.stdres
-    W = 0.97846, p-value = 0.005159
+    W = 0.8609, p-value = 3.513e-12
 
 
         Bartlett test of homogeneity of variances
 
-    data:  TE_transpositions by FBX5
-    Bartlett's K-squared = 0.57868, df = 1, p-value = 0.4468
+    data:  ratio_TE by FBX5
+    Bartlett's K-squared = 0.063316, df = 1, p-value = 0.8013
 
 
         Wilcoxon rank sum test with continuity correction
 
-    data:  df_TE_SA$TE_transpositions[df_TE_SA$FBX5 == 0] and df_TE_SA$TE_transpositions[df_TE_SA$FBX5 == 1]
-    W = 3001.5, p-value = 0.008095
+    data:  df_TE_count_allele$ratio_TE[df_TE_count_allele$FBX5 == 0] and df_TE_count_allele$ratio_TE[df_TE_count_allele$FBX5 == 1]
+    W = 4142, p-value = 0.6254
     alternative hypothesis: true location shift is not equal to 0
-
-#### Deletions
-
-``` r
-TE_plot_per_allele(df_TE_SA, "TE_deletions","FBX5")
-```
-
-![](images/TE_deletions_FBX5.png)
-
-``` r
-# Libraries for Welch test
-require(onewaytests)
-
-# Normality
-lm <- aov(TE_deletions~FBX5, data=df_TE_SA)
-lm.stdres <- rstandard(lm)
-shapiro.test(lm.stdres)
-
-# Homoscedasticity
-bartlett.test(TE_deletions~FBX5, df_TE_SA)
-
-wilcox.test(df_TE_SA$TE_deletions[df_TE_SA$FBX5==0], df_TE_SA$TE_deletions[df_TE_SA$FBX5==1], alternative = "two.sided")
-```
-
-    Shapiro-Wilk normality test
-
-    data:  lm.stdres
-    W = 0.94745, p-value = 1.999e-06
-
-
-        Bartlett test of homogeneity of variances
-
-    data:  TE_deletions by FBX5
-    Bartlett's K-squared = 0.3445, df = 1, p-value = 0.5572
-
-
-        Wilcoxon rank sum test with continuity correction
-
-    data:  df_TE_SA$TE_deletions[df_TE_SA$FBX5 == 0] and df_TE_SA$TE_deletions[df_TE_SA$FBX5 == 1]
-    W = 3176.5, p-value = 0.03136
-    alternative hypothesis: true location shift is not equal to 0
-
-Significant difference (p-value = 3%)
-
-#### Insertions
-
-``` r
-TE_plot_per_allele(df_TE_SA, "TE_insertions","FBX5")
-```
-
-![](images/TE_insertions_FBX5.png)
-
-``` r
-# Libraries for Welch test
-require(onewaytests)
-
-# Normality
-lm <- aov(TE_insertions~FBX5, data=df_TE_SA)
-lm.stdres <- rstandard(lm)
-shapiro.test(lm.stdres)
-
-# Homoscedasticity
-bartlett.test(TE_insertions~FBX5, df_TE_SA)
-
-wilcox.test(df_TE_SA$TE_insertions[df_TE_SA$FBX5==0], df_TE_SA$TE_insertions[df_TE_SA$FBX5==1], alternative = "two.sided")
-```
-
-        Shapiro-Wilk normality test
-
-    data:  lm.stdres
-    W = 0.93701, p-value = 2.49e-07
-
-
-        Bartlett test of homogeneity of variances
-
-    data:  TE_insertions by FBX5
-    Bartlett's K-squared = 1.5862, df = 1, p-value = 0.2079
-
-
-        Wilcoxon rank sum test with continuity correction
-
-    data:  df_TE_SA$TE_insertions[df_TE_SA$FBX5 == 0] and df_TE_SA$TE_insertions[df_TE_SA$FBX5 == 1]
-    W = 2823.5, p-value = 0.00162
-    alternative hypothesis: true location shift is not equal to 0
-
-Significant difference (p-value = 0.16%)
-
-## Analysis long TEs
-
-Focus only on long TEs (\>4 kb)
-
-### CMT2
-
-#### Transpositions
-
-``` r
-df_TE_SA$long_TE_transpositions <- df_TE_SA$long_TE_deletions + df_TE_SA$long_TE_insertions
-
-TE_plot_per_allele(df_TE_SA, "long_TE_transpositions","CMT2")
-```
-
-![](images/long_TE_transpositions_CMT2.png)
-
-``` r
-# Libraries for Welch test
-require(onewaytests)
-
-# Normality
-lm <- aov(long_TE_transpositions~CMT2, data=df_TE_SA)
-lm.stdres <- rstandard(lm)
-shapiro.test(lm.stdres)
-
-# Homoscedasticity
-bartlett.test(long_TE_transpositions~CMT2, df_TE_SA)
-
-wilcox.test(df_TE_SA$long_TE_transpositions[df_TE_SA$CMT2==0], df_TE_SA$long_TE_transpositions[df_TE_SA$CMT2==1], alternative = "two.sided")
-```
-
-        Shapiro-Wilk normality test
-
-    data:  lm.stdres
-    W = 0.98509, p-value = 0.04162
-
-
-        Bartlett test of homogeneity of variances
-
-    data:  long_TE_transpositions by CMT2
-    Bartlett's K-squared = 0.19622, df = 1, p-value = 0.6578
-
-
-        Wilcoxon rank sum test with continuity correction
-
-    data:  df_TE_SA$long_TE_transpositions[df_TE_SA$CMT2 == 0] and df_TE_SA$long_TE_transpositions[df_TE_SA$CMT2 == 1]
-    W = 3589.5, p-value = 0.3789
-    alternative hypothesis: true location shift is not equal to 0
-
-#### Deletions
-
-``` r
-TE_plot_per_allele(df_TE_SA, "long_TE_deletions","CMT2")
-```
-
-![](images/long_TE_deletions_CMT2.png)
-
-``` r
-# Libraries for Welch test
-require(onewaytests)
-
-# Normality
-lm <- aov(long_TE_deletions~CMT2, data=df_TE_SA)
-lm.stdres <- rstandard(lm)
-shapiro.test(lm.stdres)
-
-# Homoscedasticity
-bartlett.test(long_TE_deletions~CMT2, df_TE_SA)
-
-wilcox.test(df_TE_SA$long_TE_deletions[df_TE_SA$CMT2==0], df_TE_SA$long_TE_deletions[df_TE_SA$CMT2==1], alternative = "two.sided")
-```
-
-    Shapiro-Wilk normality test
-
-    data:  lm.stdres
-    W = 0.93414, p-value = 1.363e-07
-
-
-        Bartlett test of homogeneity of variances
-
-    data:  long_TE_deletions by CMT2
-    Bartlett's K-squared = 1.4703, df = 1, p-value = 0.2253
-
-
-        Wilcoxon rank sum test with continuity correction
-
-    data:  df_TE_SA$long_TE_deletions[df_TE_SA$CMT2 == 0] and df_TE_SA$long_TE_deletions[df_TE_SA$CMT2 == 1]
-    W = 4078.5, p-value = 0.6132
-    alternative hypothesis: true location shift is not equal to 0
-
-No significant differences
-
-#### Insertions
-
-``` r
-TE_plot_per_allele(df_TE_SA, "long_TE_insertions","CMT2")
-```
-
-![](images/long_TE_insertions_CMT2.png)
-
-``` r
-# Libraries for Welch test
-require(onewaytests)
-
-# Normality
-lm <- aov(long_TE_insertions~CMT2, data=df_TE_SA)
-lm.stdres <- rstandard(lm)
-shapiro.test(lm.stdres)
-
-# Homoscedasticity
-bartlett.test(long_TE_insertions~CMT2, df_TE_SA)
-
-wilcox.test(df_TE_SA$long_TE_insertions[df_TE_SA$CMT2==0], df_TE_SA$long_TE_insertions[df_TE_SA$CMT2==1], alternative = "two.sided")
-```
-
-    Shapiro-Wilk normality test
-
-    data:  lm.stdres
-    W = 0.95178, p-value = 4.798e-06
-
-
-        Bartlett test of homogeneity of variances
-
-    data:  long_TE_insertions by CMT2
-    Bartlett's K-squared = 0.50535, df = 1, p-value = 0.4772
-
-
-        Wilcoxon rank sum test with continuity correction
-
-    data:  df_TE_SA$long_TE_insertions[df_TE_SA$CMT2 == 0] and df_TE_SA$long_TE_insertions[df_TE_SA$CMT2 == 1]
-    W = 3389, p-value = 0.1473
-    alternative hypothesis: true location shift is not equal to 0
-
-No significant differences.
-
-### FBX5
-
-#### Transpositions
-
-``` r
-df_TE_SA$long_TE_transpositions <- df_TE_SA$long_TE_deletions + df_TE_SA$long_TE_insertions
-
-TE_plot_per_allele(df_TE_SA, "long_TE_transpositions","FBX5")
-```
-
-![](images/long_TE_transpositions_FBX5.png)
-
-``` r
-# Libraries for Welch test
-require(onewaytests)
-
-# Normality
-lm <- aov(long_TE_transpositions~FBX5, data=df_TE_SA)
-lm.stdres <- rstandard(lm)
-shapiro.test(lm.stdres)
-
-# Homoscedasticity
-bartlett.test(long_TE_transpositions~FBX5, df_TE_SA)
-
-wilcox.test(df_TE_SA$long_TE_transpositions[df_TE_SA$FBX5==0], df_TE_SA$long_TE_transpositions[df_TE_SA$FBX5==1], alternative = "two.sided")
-```
-
-        Shapiro-Wilk normality test
-
-    data:  lm.stdres
-    W = 0.9862, p-value = 0.06131
-
-
-        Bartlett test of homogeneity of variances
-
-    data:  long_TE_transpositions by FBX5
-    Bartlett's K-squared = 0.014213, df = 1, p-value = 0.9051
-
-
-        Wilcoxon rank sum test with continuity correction
-
-    data:  df_TE_SA$long_TE_transpositions[df_TE_SA$FBX5 == 0] and df_TE_SA$long_TE_transpositions[df_TE_SA$FBX5 == 1]
-    W = 2868, p-value = 0.002475
-    alternative hypothesis: true location shift is not equal to 0
-
-#### Deletions
-
-``` r
-TE_plot_per_allele(df_TE_SA, "long_TE_deletions","FBX5")
-```
-
-![](images/long_TE_deletions_FBX5.png)
-
-``` r
-# Libraries for Welch test
-require(onewaytests)
-
-# Normality
-lm <- aov(long_TE_deletions~FBX5, data=df_TE_SA)
-lm.stdres <- rstandard(lm)
-shapiro.test(lm.stdres)
-
-# Homoscedasticity
-bartlett.test(long_TE_deletions~FBX5, df_TE_SA)
-
-wilcox.test(df_TE_SA$long_TE_deletions[df_TE_SA$FBX5==0], df_TE_SA$long_TE_deletions[df_TE_SA$FBX5==1], alternative = "two.sided")
-```
-
-
-        Shapiro-Wilk normality test
-
-    data:  lm.stdres
-    W = 0.94569, p-value = 1.385e-06
-
-
-        Bartlett test of homogeneity of variances
-
-    data:  long_TE_deletions by FBX5
-    Bartlett's K-squared = 0.049754, df = 1, p-value = 0.8235
-
-
-        Wilcoxon rank sum test with continuity correction
-
-    data:  df_TE_SA$long_TE_deletions[df_TE_SA$FBX5 == 0] and df_TE_SA$long_TE_deletions[df_TE_SA$FBX5 == 1]
-    W = 2871.5, p-value = 0.002546
-    alternative hypothesis: true location shift is not equal to 0
-
-Significant difference (p-value = 0.25%).
-
-#### Insertions
-
-``` r
-TE_plot_per_allele(df_TE_SA, "long_TE_insertions","FBX5")
-```
-
-![](images/long_TE_insertions_FBX5.png)
-
-``` r
-# Libraries for Welch test
-require(onewaytests)
-
-# Normality
-lm <- aov(long_TE_insertions~FBX5, data=df_TE_SA)
-lm.stdres <- rstandard(lm)
-shapiro.test(lm.stdres)
-
-# Homoscedasticity
-bartlett.test(long_TE_insertions~FBX5, df_TE_SA)
-
-wilcox.test(df_TE_SA$long_TE_insertions[df_TE_SA$FBX5==0], df_TE_SA$long_TE_insertions[df_TE_SA$FBX5==1], alternative = "two.sided")
-```
-
-    Shapiro-Wilk normality test
-
-    data:  lm.stdres
-    W = 0.96014, p-value = 3.481e-05
-
-
-        Bartlett test of homogeneity of variances
-
-    data:  long_TE_insertions by FBX5
-    Bartlett's K-squared = 0.23678, df = 1, p-value = 0.6265
-
-
-        Wilcoxon rank sum test with continuity correction
-
-    data:  df_TE_SA$long_TE_insertions[df_TE_SA$FBX5 == 0] and df_TE_SA$long_TE_insertions[df_TE_SA$FBX5 == 1]
-    W = 3074.5, p-value = 0.01462
-    alternative hypothesis: true location shift is not equal to 0
-
-Significant difference (p-value = 1.4%).
 
 # Marginal genealogical tree with RELATE
 
@@ -7691,11 +7124,386 @@ python ${clues_inference}/inference.py \
 --out chr2_FBX5_inference
 ```
 
-# Author
+# Selective sweep analysis (figure 7)
+
+Script from Ahmed Elfarargi.
+
+``` bash
+# 1. Selective sweep analysis (RAiSD)
+  
+  # bgzip and tabix
+  bgzip -c subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf > subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf.gz
+  tabix -p vcf subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf.gz
+  
+  # Split by Chr
+  for i in {1,2,3,4,5}; do 
+    bcftools view -r Chr${i} subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf.gz > subset_189_SA_accessions_biallelic_DP3_GQ25_Ch${i}.vcf
+  done
+  
+  # Run RAiSD
+  for i in {1..5}; do 
+    RAiSD -n Santo_RAiSD_w50_chr${i} -I subset_189_SA_accessions_biallelic_DP3_GQ25_Ch${i}.vcf -y 1 -A 0.905 -M 0 -w 50 -a 123 -D -R -P -O -s -f
+  done
+
+# 2. Pairwise Fst analysis using vcftools
+  vcftools \
+  --vcf subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf \
+  --weir-fst-pop picoespong.txt \
+  --weir-fst-pop covafig.txt \
+  --fst-window-size 10000 \
+  --fst-window-step 1000 \
+  --out picoespong_vs_covafig_w10k_s1k
+```
+
+``` r
+# libraries
+library(tidyverse)
+library(sf)
+library(maptiles)
+library(tidyterra)
+library(terra)
+library(ggrepel)
+library(ggspatial)
+library(RColorBrewer)
+library(ggtext)
+library(glue)
+library(ggpubr) 
+library(cowplot)
+
+# ==============================================================================
+# load data 
+# ==============================================================================
+file_coords <- "santo_coords_inds.csv"
+file_pheno  <- "santo_pheno_data.csv"
+
+# order for variants
+target_order <- c("VIM2/VIM4", "CMT2", "FBX5")
+
+# RAiSD Files (Panel C)
+files_raisd <- c(
+  "Chr1" = "Santo_RAiSD_w50_chr1.Chr1",
+  "Chr2" = "Santo_RAiSD_w50_chr2.Chr2",
+  "Chr3" = "Santo_RAiSD_w50_chr3.Chr3",
+  "Chr4" = "Santo_RAiSD_w50_chr4.Chr4",
+  "Chr5" = "Santo_RAiSD_w50_chr5.Chr5"
+)
+
+# Fst File (Panel D)
+file_fst <- "picoespong_vs_covafig_w10k_s1k.windowed.weir.fst"
+
+
+# ==============================================================================
+# Panel A: Geographical map
+# ==============================================================================
+data_a <- read.table("Santo_coords_groups.csv", header = TRUE, sep = ",") %>%
+  rename(Group = Region, Cluster = Group, n = N, lon = Longitude, lat = Latitude) %>%
+  arrange(Cluster, Group) %>%
+  mutate(Legend_Label = factor(paste0(Cluster, ": ", Group), levels = unique(paste0(Cluster, ": ", Group))))
+
+data_a$Group <- factor(data_a$Group, levels = unique(data_a$Group))
+
+points_sf <- st_as_sf(data_a, coords = c("lon", "lat"), crs = 4326)
+
+base_cols <- c("#0075DC", "yellow4", "#C20088", "#2BCE48")
+final_colors <- c()
+clusters <- unique(data_a$Cluster)
+
+for(i in seq_along(clusters)) {
+  grps <- data_a %>% filter(Cluster == clusters[i]) %>% pull(Legend_Label) %>% unique() %>% sort()
+  pal <- colorRampPalette(c("white", base_cols[i], "black"))(length(grps) + 4)[3:(length(grps) + 2)]
+  names(pal) <- grps
+  final_colors <- c(final_colors, pal)
+}
+
+bbox <- st_bbox(c(xmin = -25.1, xmax = -25.01, ymin = 17.09, ymax = 17.125), crs = st_crs(4326))
+tiles <- get_tiles(st_as_sfc(bbox), provider = "Esri.WorldImagery", zoom = 15, crop = TRUE)
+
+p_a <- ggplot() +
+  geom_spatraster_rgb(data = tiles, alpha = 0.6) +
+  geom_sf(data = points_sf, aes(color = Legend_Label, size = n), show.legend = "point") +
+  geom_label_repel(data = data_a, aes(lon, lat, label = Group, fill = Legend_Label),
+                   fontface = "bold", size = 4, box.padding = 0.5, color = "white", alpha = 0.8,
+                   min.segment.length = 0, max.overlaps = 20, show.legend = FALSE) +
+  scale_color_manual(values = final_colors) +
+  scale_fill_manual(values = final_colors) +
+  scale_size_area(max_size = 10, name = NULL) +
+  guides(color = "none", fill = "none", size = guide_legend(title.position = "top")) +
+  annotate("text", x=-25.085, y=17.12, label="Espongeiro", color="black", size = 6, fontface="bold") +
+  annotate("text", x=-25.060, y=17.10, label="Cova", color="black", size = 6, fontface="bold") +
+  annotate("text", x=-25.040, y=17.098, label="Figueira", color="black", size = 6, fontface="bold") +
+  annotate("text", x=-25.02, y=17.1075, label="Pico", color="black", size = 6, fontface="bold") +
+  annotation_scale(location = "br", width_hint = 0.2, style = "ticks", line_col = "black", text_col = "black") +
+  annotation_north_arrow(location = "tl", style = north_arrow_minimal(line_col = "black", text_col = "black"), height = unit(1, "cm")) +
+  coord_sf(xlim = c(-25.1, -25.01), ylim = c(17.09, 17.125), expand = FALSE) +
+  labs(tag = "a") +
+  theme_bw(base_size = 14) +
+  theme(
+    axis.text = element_blank(), axis.ticks = element_blank(), 
+    axis.title = element_blank(),
+    plot.tag = element_text(size = 20, face = "bold"),
+    legend.position = c(0.999, 0.999), 
+    legend.justification = c(1, 1),
+    legend.background = element_rect(fill = alpha("white", 0.8), color = "black", linewidth = 0.5),
+    legend.key = element_blank(),
+    legend.title = element_text(face = "bold", size = 10, hjust = 0.5),
+    legend.text = element_text(size = 10)
+  )
+
+# ==============================================================================
+# Panel B: Derived allele frequency
+# ==============================================================================
+cols_c <- c("Cova"="#0075DC", "Espongeiro"="yellow4", "Figueira"="#C20088", "Pico"="#2BCE48")
+cols_g <- c("CMT2"="navyblue", "FBX5"="coral2", "VIM2/VIM4"="palegreen4")
+ord_c <- c("Espongeiro", "Cova", "Figueira", "Pico")
+
+df_b <- read.csv(file_coords) %>%
+  pivot_longer(c(CMT2, FBX5, VIM2_4_DEL), names_to="Gene", values_to="Allele") %>%
+  mutate(Gene = ifelse(Gene == "VIM2_4_DEL", "VIM2/VIM4", Gene)) %>%
+  # CHANGED: Force Factor Order for Panel B
+  mutate(Gene = factor(Gene, levels = target_order)) %>%
+  group_by(Cluster, Group) %>%
+  mutate(n = n_distinct(SeqID)) %>%
+  group_by(Cluster, Group, n, Gene) %>%
+  summarise(Freq = sum(Allele == "Derived", na.rm=TRUE) / n(), .groups="drop") %>%
+  mutate(
+    xlb = paste0(Group, "\n(n=", n, ")"),
+    c_lbl = glue("<span style='color:{cols_c[Cluster]};'>{Cluster}</span>"),
+    num = as.numeric(str_extract(Group, "\\d+"))
+  ) %>%
+  arrange(factor(Cluster, levels=ord_c), num) %>%
+  mutate(
+    Cluster = factor(Cluster, levels=ord_c),
+    xlb = factor(xlb, levels=unique(xlb)),
+    c_lbl = factor(c_lbl, levels=unique(c_lbl))
+  )
+
+p_b <- ggplot(df_b, aes(xlb, Freq, fill=Gene)) +
+  geom_bar(stat="identity", position=position_dodge(0.8), width=0.7) +
+  scale_fill_manual(values=cols_g) +
+  scale_y_continuous(labels=scales::percent, limits=c(0, 1.05), expand=c(0,0)) +
+  facet_grid(~c_lbl, scales="free_x", space="free_x", switch="x") +
+  labs(x=NULL, y="Derived allele frequency", fill=NULL, tag = "b") + # CHANGED to lowercase
+  theme_bw(base_size=14) +
+  theme(
+    strip.text.x.bottom=element_markdown(face="bold", size=12, margin=margin(t=5, b=5)),
+    strip.background=element_rect(fill="white", color="black"),
+    strip.placement="outside",
+    axis.text.x=element_text(angle=0, hjust=0.5, size=10, color="black"),
+    axis.title.y=element_text(face="bold", margin=margin(r=10)),
+    legend.position="top",
+    panel.grid.major.x=element_blank(),
+    panel.grid.minor.x=element_blank(),
+    plot.tag = element_text(size = 20, face = "bold")
+  )
+
+
+# ==============================================================================
+# Panel C: RAISD histogram
+# ==============================================================================
+genes_c <- tibble(
+  name = c("CMT2", "FBX5", "VIM2/VIM4"),
+  chrom = c("Chr4", "Chr2", "Chr1"),
+  pos = c(10420088, 18513626, 24586731)
+)
+cols_c_plot <- c("CMT2" = "navyblue", "FBX5" = "coral2", "VIM2/VIM4" = "palegreen4")
+
+df_c <- map_dfr(files_raisd, read_tsv, col_names = c("p", "s", "e", "v", "sf", "ld", "stat"), col_types = cols(.default = "d"), skip = 1, .id = "chr")
+scores_c <- genes_c %>% rowwise() %>%
+  mutate(stat = df_c %>% filter(chr == chrom, s <= pos, e >= pos) %>% pull(stat) %>% max(na.rm = TRUE),
+         # CHANGED: Force Factor Order for Legend in C
+         name = factor(name, levels = target_order)) 
+         
+cut_c <- quantile(df_c$stat, 0.95, na.rm = TRUE)
+mx_c <- max(ggplot_build(ggplot(df_c, aes(stat)) + geom_histogram(bins = 50))$data[[1]]$count)
+
+p_c <- ggplot(df_c, aes(stat)) +
+  geom_histogram(bins = 50, fill = "grey50", color = "black", alpha = 0.8) +
+  geom_vline(xintercept = cut_c, linetype = 2, color = "black", linewidth = 1.2) +
+  geom_vline(data = scores_c, aes(xintercept = stat, color = name), linetype = 1, linewidth = 1.2) +
+  scale_color_manual(values = cols_c_plot, name = NULL) +
+  labs(x = expression(bold("RAiSD " ~ mu ~ " statistic")), y = expression(bold(Count)), tag = "c") + # CHANGED to lowercase
+  coord_cartesian(ylim = c(0, mx_c * 1.05), clip = "off") +
+  theme_classic(base_size = 14) +
+  theme(
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5),
+    axis.line = element_blank(),
+    axis.ticks = element_line(linewidth = 1.5, color = "black"),
+    panel.grid.major.y = element_line(color = "grey90", linetype = "dotted"),
+    legend.position = "none",
+    plot.margin = unit(c(0.2, 0.5, 0.2, 0.5), "cm"),
+    plot.tag = element_text(size = 20, face = "bold"),
+    axis.text.y = element_text(color="black", size=12, hjust=1, margin = margin(r = 2)),
+    axis.title.y = element_text(face="bold", margin = margin(r = 5)),
+    axis.ticks.length = unit(0.15, "cm")
+  )
+
+
+# ==============================================================================
+# Panel D: Fst histogram
+# ==============================================================================
+genes_d <- tibble(
+  name = c("CMT2", "FBX5", "VIM2/VIM4"),
+  chr = c("Chr4", "Chr2", "Chr1"),
+  pos = c(10420088, 18513626, 24586731)
+)
+
+df_d <- read_tsv(file_fst, show_col_types = FALSE) %>%
+  mutate(FST = as.numeric(WEIGHTED_FST), chr_n = as.numeric(gsub("Chr", "", CHROM))) %>%
+  filter(FST >= 0, !is.na(chr_n), !is.na(BIN_START))
+
+cands_d <- genes_d %>% rowwise() %>%
+  mutate(FST = df_d %>% filter(CHROM == chr, BIN_START <= pos, BIN_END >= pos) %>% pull(FST) %>% max(na.rm = TRUE),
+         # CHANGED: Force Factor Order for Legend in D
+         name = factor(name, levels = target_order))
+
+cut95_d <- quantile(df_d$FST, 0.95, na.rm = TRUE)
+ymax_d <- max(ggplot_build(ggplot(df_d, aes(FST)) + geom_histogram(bins = 50))$data[[1]]$count) * 1.05
+
+p_d <- ggplot(df_d, aes(FST)) +
+  geom_histogram(bins = 50, fill = "grey50", color = "black", alpha = 0.8) +
+  geom_vline(xintercept = cut95_d, linetype = 2, linewidth = 1.2) +
+  geom_vline(data = cands_d, aes(xintercept = FST, color = name), linetype = 1, linewidth = 1.2) +
+  scale_color_manual(values = cols_c_plot, name = NULL) +
+  labs(x = expression(bold(~F[ST])), y = expression(bold(Count)), tag = "d") + # CHANGED to lowercase
+  coord_cartesian(ylim = c(0, ymax_d), clip = "off") +
+  theme_classic(base_size = 14) +
+  theme(
+    panel.border = element_rect(fill = NA, linewidth = 1),
+    axis.line = element_blank(),
+    axis.ticks = element_line(linewidth = 1, color = "black"),
+    panel.grid.major.y = element_line(color = "grey90", linetype = "dotted"),
+    legend.position = "none",
+    plot.margin = unit(c(0.2, 0.5, 0.2, 0.5), "cm"),
+    plot.tag = element_text(size = 20, face = "bold"),
+    axis.text.y = element_text(color="black", size=12, hjust=1, margin = margin(r = 2)),
+    axis.title.y = element_text(face="bold", margin = margin(r = 5)),
+    axis.ticks.length = unit(0.15, "cm")
+  )
+
+
+# ==============================================================================
+# Panel E: Phenotypic Effects
+# ==============================================================================
+vars_e <- c("CMT2", "FBX5", "VIM2_4_DEL")
+cols_e <- c("Ancestral" = "#606060", "CMT2" = "navyblue", "FBX5" = "coral2", "VIM2/VIM4" = "palegreen4")
+
+df_e <- read.csv(file_pheno) %>%
+  select(SeqID, FRI, all_of(vars_e), FloweringDays, delta13C_31_Avg) %>%
+  pivot_longer(cols = all_of(vars_e), names_to = "Variant", values_to = "Genotype") %>%
+  filter(!is.na(Genotype), !is.na(FRI)) %>%
+  mutate(
+    Genotype = factor(Genotype, levels = c("Ancestral", "Derived")),
+    FRI = factor(FRI, levels = c("Ancestral", "Derived")),
+    Var_Lab = ifelse(Variant == "VIM2_4_DEL", "VIM2/VIM4", Variant),
+    # CHANGED: Force Factor Order for Panel E axis
+    Var_Lab = factor(Var_Lab, levels = target_order),
+    X_Lab = glue("{Var_Lab}<sub>{ifelse(Genotype=='Ancestral', 'Anc', 'Der')}</sub>"),
+    Col_Grp = ifelse(Genotype == "Ancestral", "Ancestral", as.character(Var_Lab))
+  )
+
+x_ord_e <- df_e %>%
+  arrange(Var_Lab, Genotype) %>%
+  distinct(X_Lab) %>%
+  pull(X_Lab)
+df_e$X_Lab <- factor(df_e$X_Lab, levels = x_ord_e)
+
+stats_ft <- df_e %>%
+  filter(!is.na(FloweringDays)) %>%
+  group_by(Variant, Var_Lab) %>%
+  summarise(
+    p = summary(lm(FloweringDays ~ Genotype + FRI))$coefficients["GenotypeDerived", 4],
+    y = max(FloweringDays) + diff(range(FloweringDays)) * 0.15,
+    group1 = X_Lab[Genotype == "Ancestral"][1],
+    group2 = X_Lab[Genotype == "Derived"][1],
+    .groups = "drop"
+  ) %>%
+  mutate(label = scales::pvalue(p, accuracy = 0.0001, add_p = TRUE))
+
+stats_wue <- df_e %>%
+  filter(!is.na(delta13C_31_Avg)) %>%
+  group_by(Variant, Var_Lab) %>%
+  summarise(
+    p = summary(lm(delta13C_31_Avg ~ Genotype))$coefficients["GenotypeDerived", 4],
+    y = max(delta13C_31_Avg) + diff(range(delta13C_31_Avg)) * 0.15,
+    group1 = X_Lab[Genotype == "Ancestral"][1],
+    group2 = X_Lab[Genotype == "Derived"][1],
+    .groups = "drop"
+  ) %>%
+  mutate(label = scales::pvalue(p, accuracy = 0.0001, add_p = TRUE))
+
+n_ft <- df_e %>%
+  filter(!is.na(FloweringDays)) %>%
+  count(X_Lab) %>%
+  mutate(lab = paste0("n=", n))
+n_wue <- df_e %>%
+  filter(!is.na(delta13C_31_Avg)) %>%
+  count(X_Lab) %>%
+  mutate(lab = paste0("n=", n))
+
+base_theme_e <- theme_classic(base_size = 9) + theme(
+  legend.position = "none",
+  axis.title.y = element_text(face = "bold", size = 12, margin = margin(r = 5)),
+  axis.text.y = element_text(size = 10, color = "black"),
+  axis.line = element_line(linewidth = 1.2),
+  axis.ticks = element_line(linewidth = 1.2),
+  axis.ticks.length = unit(0.2, "cm"),
+  panel.border = element_rect(color = "black", fill = NA, linewidth = 1.5)
+)
+
+p_e1 <- ggplot(df_e %>% filter(!is.na(FloweringDays)), aes(X_Lab, FloweringDays, fill = Col_Grp)) +
+  geom_vline(xintercept = seq(2.5, length(x_ord_e) - 1.5, 2), color = "gray60", linewidth = 0.8) +
+  geom_jitter(aes(color = Col_Grp), width = 0.2, shape = 16, size = 2, alpha = 0.6) +
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "black", size = 0.8, fatten = 2.5) +
+  stat_pvalue_manual(stats_ft, label = "label", y.position = "y", tip.length = 0.01, size = 3) +
+  geom_text(data = n_ft, aes(X_Lab, -Inf, label = lab), vjust = -1.5, size = 3, inherit.aes = FALSE) +
+  scale_fill_manual(values = cols_e) +
+  scale_color_manual(values = cols_e) +
+  scale_y_continuous(expand = expansion(mult = c(0.15, 0.15))) +
+  labs(y = "Days to flowering", x = NULL, tag = "e") + # CHANGED to lowercase
+  base_theme_e +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x = element_blank(),
+    plot.margin = margin(t = 5.5, r = 5.5, b = -6, l = 5.5),
+    plot.tag = element_text(size = 20, face = "bold")
+  )
+
+p_e2 <- ggplot(df_e %>% filter(!is.na(delta13C_31_Avg)), aes(X_Lab, delta13C_31_Avg, fill = Col_Grp)) +
+  geom_vline(xintercept = seq(2.5, length(x_ord_e) - 1.5, 2), color = "gray60", linewidth = 0.8) +
+  geom_jitter(aes(color = Col_Grp), width = 0.2, shape = 16, size = 2, alpha = 0.6) +
+  stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "black", size = 0.8, fatten = 2.5) +
+  stat_pvalue_manual(stats_wue, label = "label", y.position = "y", tip.length = 0.01, size = 3) +
+  geom_text(data = n_wue, aes(X_Lab, -Inf, label = lab), vjust = -1.5, size = 3, inherit.aes = FALSE) +
+  scale_fill_manual(values = cols_e) +
+  scale_color_manual(values = cols_e) +
+  scale_y_continuous(expand = expansion(mult = c(0.15, 0.15))) +
+  labs(y = expression(bold(paste("WUE (", delta^13, "C)"))), x = NULL) +
+  base_theme_e +
+  theme(
+    axis.text.x = element_markdown(angle = 45, hjust = 1, size = 9, face = "bold", color = "black"),
+    plot.margin = margin(t = -6, r = 5.5, b = 5.5, l = 5.5)
+  )
+
+
+# ==============================================================================
+# Final figure with all panels
+# ==============================================================================
+col_right <- plot_grid(p_e1, p_e2, ncol = 1, align = "v", rel_heights = c(1, 1.2))
+col_left <- plot_grid(p_c, p_d, ncol = 1, align = "v")
+bottom_row <- plot_grid(col_left, col_right, ncol = 2, rel_widths = c(1, 1))
+final_plot <- plot_grid(p_a, p_b, bottom_row, ncol = 1, rel_heights = c(1.5, 1, 2.5))
+
+# Save
+ggsave("Figure7.pdf", final_plot, width = 14, height = 16)
+```
+
+# Authors
 
 - **Johan Zicola** - [johanzi](https://github.com/johanzi)
 - **Emmanuel Tergemina**
   [EmmanuelTergemina](https://github.com/EmmanuelTergemina)
+- **Ahmed F. Elfarargi**
 
 # License
 
