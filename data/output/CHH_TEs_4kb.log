@@ -1,0 +1,38 @@
+LOG FILE
+
+Command: run_gwas_gemma.sh CHH_TEs_4kb.tsv vcf_files/GATK/subset_83_biallelic_alt_DP3_GQ25_wo_singletons.recode.vcf.gz
+Phenotype file: CHH_TEs_4kb.tsv
+VCF file: vcf_files/GATK/subset_83_biallelic_alt_DP3_GQ25_wo_singletons.recode.vcf.gz
+Output file: /usr/users/zicola/git_repositories/scripts_cvi_methylation_variants/data/output/CHH_TEs_4kb.assoc.clean.txt
+Run finished on Tue Jun 17 15:50:00 CEST 2025
+Total time of the run: 145 seconds 
+
+Log output from GEMMA:
+##
+## GEMMA Version = 0.94
+##
+## Command Line Input = -bfile vcf_files/GATK/subset_83_biallelic_alt_DP3_GQ25_wo_singletons -k /usr/users/zicola/git_repositories/scripts_cvi_methylation_variants/data/output/subset_83_biallelic_alt_DP3_GQ25_wo_singletons.sXX.txt -lmm 2 -maf 0.05 -o CHH_TEs_4kb 
+##
+## Summary Statistics:
+## number of total individuals = 83
+## number of analyzed individuals = 83
+## number of covariates = 1
+## number of phenotypes = 1
+## number of total SNPs = 1816209
+## number of analyzed SNPs = 40515
+## REMLE log-likelihood in the null model = -225.013
+## MLE log-likelihood in the null model = -222.178
+## pve estimate in the null model = 0.794232
+## se(pve) in the null model = 0.204272
+## vg estimate in the null model = 12.4774
+## ve estimate in the null model = 3.23262
+## beta estimate in the null model =   8.3849
+## se(beta) =   0.197351
+##
+## Computation Time:
+## total computation time = 0.162667 min 
+## computation time break down: 
+##      time on eigen-decomposition = 0.000166667 min 
+##      time on calculating UtX = 0.00433333 min 
+##      time on optimization = 0.046 min 
+##

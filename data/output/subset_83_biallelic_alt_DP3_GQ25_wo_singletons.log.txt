@@ -1,0 +1,18 @@
+##
+## GEMMA Version = 0.94
+##
+## Command Line Input = -bfile vcf_files/GATK/subset_83_biallelic_alt_DP3_GQ25_wo_singletons -gk 2 -o subset_83_biallelic_alt_DP3_GQ25_wo_singletons 
+##
+## Summary Statistics:
+## number of total individuals = 83
+## number of analyzed individuals = 83
+## number of covariates = 1
+## number of phenotypes = 1
+## number of total SNPs = 1816209
+## number of analyzed SNPs = 54527
+##
+## Computation Time:
+## total computation time = 0.115167 min 
+## computation time break down: 
+##      time on calculating relatedness matrix = 0.00683333 min 
+##

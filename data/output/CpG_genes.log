@@ -1,0 +1,38 @@
+LOG FILE
+
+Command: run_gwas_gemma.sh CpG_genes.tsv subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz
+Phenotype file: CpG_genes.tsv
+VCF file: subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.recode.vcf.gz
+Output file: /netscratch/irg/grp_hancock/johan/GWAS/dna_methylation/GWAS_83_SA/output/CpG_genes.assoc.clean.txt
+Run finished on Wed Jul 17 16:31:07 CEST 2024
+Total time of the run: 20 seconds 
+
+Log output from GEMMA:
+##
+## GEMMA Version = 0.94
+##
+## Command Line Input = -bfile subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons -k /netscratch/irg/grp_hancock/johan/GWAS/dna_methylation/GWAS_83_SA/output/subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons.sXX.txt -lmm 2 -maf 0.05 -o CpG_genes 
+##
+## Summary Statistics:
+## number of total individuals = 83
+## number of analyzed individuals = 83
+## number of covariates = 1
+## number of phenotypes = 1
+## number of total SNPs = 954216
+## number of analyzed SNPs = 10321
+## REMLE log-likelihood in the null model = -78.8992
+## MLE log-likelihood in the null model = -78.6384
+## pve estimate in the null model = 0.919164
+## se(pve) in the null model = 0.0254894
+## vg estimate in the null model = 1.09008
+## ve estimate in the null model = 0.0958673
+## beta estimate in the null model =   9.10768
+## se(beta) =   0.0339857
+##
+## Computation Time:
+## total computation time = 0.186667 min 
+## computation time break down: 
+##      time on eigen-decomposition = 0 min 
+##      time on calculating UtX = 0.000666667 min 
+##      time on optimization = 0.0455 min 
+##
