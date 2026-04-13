@@ -2,7 +2,7 @@ High impact mutations drive DNA methylation variation after colonization
 of a novel habitat
 ================
 Johan Zicola
-2026-04-08 16:53:09
+2026-04-13 08:54:39
 
 - [Overview](#overview)
 - [Softwares required](#softwares-required)
@@ -7126,24 +7126,17 @@ python ${clues_inference}/inference.py \
 
 # Selective sweep analysis (figure 7)
 
-Script from Ahmed Elfarargi.
+Scripts from Ahmed Elfarargi.
 
 ``` bash
 # 1. Selective sweep analysis (RAiSD)
-  
   # bgzip and tabix
   bgzip -c subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf > subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf.gz
   tabix -p vcf subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf.gz
-  
   # Split by Chr
-  for i in {1,2,3,4,5}; do 
-    bcftools view -r Chr${i} subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf.gz > subset_189_SA_accessions_biallelic_DP3_GQ25_Ch${i}.vcf
-  done
-  
+  for i in {1,2,3,4,5}; do bcftools view -r Chr${i} subset_189_SA_accessions_biallelic_DP3_GQ25.recode.vcf.gz > subset_189_SA_accessions_biallelic_DP3_GQ25_Ch${i}.vcf; done
   # Run RAiSD
-  for i in {1..5}; do 
-    RAiSD -n Santo_RAiSD_w50_chr${i} -I subset_189_SA_accessions_biallelic_DP3_GQ25_Ch${i}.vcf -y 1 -A 0.905 -M 0 -w 50 -a 123 -D -R -P -O -s -f
-  done
+  for i in {1..5}; do RAiSD -n Santo_RAiSD_w50_chr${i} -I subset_189_SA_accessions_biallelic_DP3_GQ25_Ch${i}.vcf -y 1 -A 0.905 -M 0 -w 50 -a 123 -D -R -P -O -s -f; done
 
 # 2. Pairwise Fst analysis using vcftools
   vcftools \
@@ -7250,7 +7243,7 @@ p_a <- ggplot() +
   )
 
 # ==============================================================================
-# Panel B: Derived allele frequency
+# Panel B: Drived allele frequency
 # ==============================================================================
 cols_c <- c("Cova"="#0075DC", "Espongeiro"="yellow4", "Figueira"="#C20088", "Pico"="#2BCE48")
 cols_g <- c("CMT2"="navyblue", "FBX5"="coral2", "VIM2/VIM4"="palegreen4")
@@ -7401,44 +7394,29 @@ df_e <- read.csv(file_pheno) %>%
     Col_Grp = ifelse(Genotype == "Ancestral", "Ancestral", as.character(Var_Lab))
   )
 
-x_ord_e <- df_e %>%
-  arrange(Var_Lab, Genotype) %>%
-  distinct(X_Lab) %>%
-  pull(X_Lab)
+x_ord_e <- df_e %>% arrange(Var_Lab, Genotype) %>% distinct(X_Lab) %>% pull(X_Lab)
 df_e$X_Lab <- factor(df_e$X_Lab, levels = x_ord_e)
 
-stats_ft <- df_e %>%
-  filter(!is.na(FloweringDays)) %>%
-  group_by(Variant, Var_Lab) %>%
+stats_ft <- df_e %>% filter(!is.na(FloweringDays)) %>% group_by(Variant, Var_Lab) %>%
   summarise(
     p = summary(lm(FloweringDays ~ Genotype + FRI))$coefficients["GenotypeDerived", 4],
     y = max(FloweringDays) + diff(range(FloweringDays)) * 0.15,
     group1 = X_Lab[Genotype == "Ancestral"][1],
     group2 = X_Lab[Genotype == "Derived"][1],
     .groups = "drop"
-  ) %>%
-  mutate(label = scales::pvalue(p, accuracy = 0.0001, add_p = TRUE))
+  ) %>% mutate(label = scales::pvalue(p, accuracy = 0.0001, add_p = TRUE))
 
-stats_wue <- df_e %>%
-  filter(!is.na(delta13C_31_Avg)) %>%
-  group_by(Variant, Var_Lab) %>%
+stats_wue <- df_e %>% filter(!is.na(delta13C_31_Avg)) %>% group_by(Variant, Var_Lab) %>%
   summarise(
     p = summary(lm(delta13C_31_Avg ~ Genotype))$coefficients["GenotypeDerived", 4],
     y = max(delta13C_31_Avg) + diff(range(delta13C_31_Avg)) * 0.15,
     group1 = X_Lab[Genotype == "Ancestral"][1],
     group2 = X_Lab[Genotype == "Derived"][1],
     .groups = "drop"
-  ) %>%
-  mutate(label = scales::pvalue(p, accuracy = 0.0001, add_p = TRUE))
+  ) %>% mutate(label = scales::pvalue(p, accuracy = 0.0001, add_p = TRUE))
 
-n_ft <- df_e %>%
-  filter(!is.na(FloweringDays)) %>%
-  count(X_Lab) %>%
-  mutate(lab = paste0("n=", n))
-n_wue <- df_e %>%
-  filter(!is.na(delta13C_31_Avg)) %>%
-  count(X_Lab) %>%
-  mutate(lab = paste0("n=", n))
+n_ft <- df_e %>% filter(!is.na(FloweringDays)) %>% count(X_Lab) %>% mutate(lab = paste0("n=", n))
+n_wue <- df_e %>% filter(!is.na(delta13C_31_Avg)) %>% count(X_Lab) %>% mutate(lab = paste0("n=", n))
 
 base_theme_e <- theme_classic(base_size = 9) + theme(
   legend.position = "none",
@@ -7456,18 +7434,15 @@ p_e1 <- ggplot(df_e %>% filter(!is.na(FloweringDays)), aes(X_Lab, FloweringDays,
   stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "black", size = 0.8, fatten = 2.5) +
   stat_pvalue_manual(stats_ft, label = "label", y.position = "y", tip.length = 0.01, size = 3) +
   geom_text(data = n_ft, aes(X_Lab, -Inf, label = lab), vjust = -1.5, size = 3, inherit.aes = FALSE) +
-  scale_fill_manual(values = cols_e) +
-  scale_color_manual(values = cols_e) +
+  scale_fill_manual(values = cols_e) + scale_color_manual(values = cols_e) +
   scale_y_continuous(expand = expansion(mult = c(0.15, 0.15))) +
   labs(y = "Days to flowering", x = NULL, tag = "e") + # CHANGED to lowercase
   base_theme_e +
-  theme(
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
-    axis.title.x = element_blank(),
-    plot.margin = margin(t = 5.5, r = 5.5, b = -6, l = 5.5),
-    plot.tag = element_text(size = 20, face = "bold")
-  )
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        axis.title.x = element_blank(), 
+        plot.margin = margin(t = 5.5, r = 5.5, b = -6, l = 5.5),
+        plot.tag = element_text(size = 20, face = "bold"))
 
 p_e2 <- ggplot(df_e %>% filter(!is.na(delta13C_31_Avg)), aes(X_Lab, delta13C_31_Avg, fill = Col_Grp)) +
   geom_vline(xintercept = seq(2.5, length(x_ord_e) - 1.5, 2), color = "gray60", linewidth = 0.8) +
@@ -7475,16 +7450,44 @@ p_e2 <- ggplot(df_e %>% filter(!is.na(delta13C_31_Avg)), aes(X_Lab, delta13C_31_
   stat_summary(fun.data = "mean_cl_boot", geom = "pointrange", color = "black", size = 0.8, fatten = 2.5) +
   stat_pvalue_manual(stats_wue, label = "label", y.position = "y", tip.length = 0.01, size = 3) +
   geom_text(data = n_wue, aes(X_Lab, -Inf, label = lab), vjust = -1.5, size = 3, inherit.aes = FALSE) +
-  scale_fill_manual(values = cols_e) +
-  scale_color_manual(values = cols_e) +
+  scale_fill_manual(values = cols_e) + scale_color_manual(values = cols_e) +
   scale_y_continuous(expand = expansion(mult = c(0.15, 0.15))) +
   labs(y = expression(bold(paste("WUE (", delta^13, "C)"))), x = NULL) +
   base_theme_e +
-  theme(
-    axis.text.x = element_markdown(angle = 45, hjust = 1, size = 9, face = "bold", color = "black"),
-    plot.margin = margin(t = -6, r = 5.5, b = 5.5, l = 5.5)
-  )
+  theme(axis.text.x = element_markdown(angle = 45, hjust = 1, size = 9, face = "bold", color = "black"), 
+        plot.margin = margin(t = -6, r = 5.5, b = 5.5, l = 5.5))
 
+# models and stats
+for (var in unique(df_e$Var_Lab)) {
+  sub_df <- df_e %>% filter(Var_Lab == var)
+  
+  # 1. flowering time (controlled for FRIK232X)
+  df_ft <- sub_df %>% filter(!is.na(FloweringDays))
+  if(nrow(df_ft) > 0) {
+    mod_ft <- summary(lm(FloweringDays ~ Genotype + FRI, data = df_ft))
+    beta_ft <- mod_ft$coefficients["GenotypeDerived", "Estimate"]
+    se_ft <- mod_ft$coefficients["GenotypeDerived", "Std. Error"]
+    p_ft <- mod_ft$coefficients["GenotypeDerived", "Pr(>|t|)"]
+    
+    p_ft_format <- scales::pvalue(p_ft, accuracy = 0.001, add_p = TRUE)
+  }
+  
+  # 2. Water Use Efficiency
+  df_wue <- sub_df %>% filter(!is.na(delta13C_31_Avg))
+  if(nrow(df_wue) > 0) {
+    mod_wue <- summary(lm(delta13C_31_Avg ~ Genotype, data = df_wue))
+    beta_wue <- mod_wue$coefficients["GenotypeDerived", "Estimate"]
+    se_wue <- mod_wue$coefficients["GenotypeDerived", "Std. Error"]
+    p_wue <- mod_wue$coefficients["GenotypeDerived", "Pr(>|t|)"]
+    
+    p_wue_format <- scales::pvalue(p_wue, accuracy = 0.001, add_p = TRUE)
+  }
+  
+  # print stats
+  cat(paste0("\n--- ", var, " ---\n"))
+  cat(sprintf("Flowering Time: (beta = %.2f, SE = %.2f, %s)\n", beta_ft, se_ft, p_ft_format))
+  cat(sprintf("WUE (delta13C): (beta = %.2f, SE = %.2f, %s)\n", beta_wue, se_wue, p_wue_format))
+}
 
 # ==============================================================================
 # Final figure with all panels
@@ -7500,10 +7503,11 @@ ggsave("Figure7.pdf", final_plot, width = 14, height = 16)
 
 # Authors
 
-- **Johan Zicola** - [johanzi](https://github.com/johanzi)
+- **Johan Zicola** [johanzi](https://github.com/johanzi)
 - **Emmanuel Tergemina**
   [EmmanuelTergemina](https://github.com/EmmanuelTergemina)
 - **Ahmed F. Elfarargi**
+  [AhmedElfarargi](https://github.com/AhmedElfarargi)
 
 # License
 
