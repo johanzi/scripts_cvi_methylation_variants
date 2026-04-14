@@ -2,7 +2,7 @@ High impact mutations drive DNA methylation variation after colonization
 of a novel habitat
 ================
 Johan Zicola
-2026-04-13 08:54:39
+2026-04-14 08:12:30
 
 - [Overview](#overview)
 - [Softwares required](#softwares-required)
@@ -7166,29 +7166,28 @@ library(cowplot)
 # ==============================================================================
 # load data 
 # ==============================================================================
-file_coords <- "santo_coords_inds.csv"
-file_pheno  <- "santo_pheno_data.csv"
+file_coords <- "data/figure7/santo_coords_inds.csv"
+file_pheno  <- "data/figure7/santo_pheno_data.csv"
 
 # order for variants
 target_order <- c("VIM2/VIM4", "CMT2", "FBX5")
 
 # RAiSD Files (Panel C)
 files_raisd <- c(
-  "Chr1" = "Santo_RAiSD_w50_chr1.Chr1",
-  "Chr2" = "Santo_RAiSD_w50_chr2.Chr2",
-  "Chr3" = "Santo_RAiSD_w50_chr3.Chr3",
-  "Chr4" = "Santo_RAiSD_w50_chr4.Chr4",
-  "Chr5" = "Santo_RAiSD_w50_chr5.Chr5"
+  "Chr1" = "data/figure7/Santo_RAiSD_w50_chr1.Chr1",
+  "Chr2" = "data/figure7/Santo_RAiSD_w50_chr2.Chr2",
+  "Chr3" = "data/figure7/Santo_RAiSD_w50_chr3.Chr3",
+  "Chr4" = "data/figure7/Santo_RAiSD_w50_chr4.Chr4",
+  "Chr5" = "data/figure7/Santo_RAiSD_w50_chr5.Chr5"
 )
 
 # Fst File (Panel D)
-file_fst <- "picoespong_vs_covafig_w10k_s1k.windowed.weir.fst"
-
+file_fst <- "data/figure7/picoespong_vs_covafig_w10k_s1k.windowed.weir.fst"
 
 # ==============================================================================
 # Panel A: Geographical map
 # ==============================================================================
-data_a <- read.table("Santo_coords_groups.csv", header = TRUE, sep = ",") %>%
+data_a <- read.table("data/figure7/Santo_coords_groups.csv", header = TRUE, sep = ",") %>%
   rename(Group = Region, Cluster = Group, n = N, lon = Longitude, lat = Latitude) %>%
   arrange(Cluster, Group) %>%
   mutate(Legend_Label = factor(paste0(Cluster, ": ", Group), levels = unique(paste0(Cluster, ": ", Group))))
@@ -7243,7 +7242,7 @@ p_a <- ggplot() +
   )
 
 # ==============================================================================
-# Panel B: Drived allele frequency
+# Panel B: Derived allele frequency
 # ==============================================================================
 cols_c <- c("Cova"="#0075DC", "Espongeiro"="yellow4", "Figueira"="#C20088", "Pico"="#2BCE48")
 cols_g <- c("CMT2"="navyblue", "FBX5"="coral2", "VIM2/VIM4"="palegreen4")
@@ -7291,7 +7290,7 @@ p_b <- ggplot(df_b, aes(xlb, Freq, fill=Gene)) +
 
 
 # ==============================================================================
-# Panel C: RAISD histogram
+# Panel C: RAiSD histogram
 # ==============================================================================
 genes_c <- tibble(
   name = c("CMT2", "FBX5", "VIM2/VIM4"),
@@ -7503,10 +7502,10 @@ ggsave("Figure7.pdf", final_plot, width = 14, height = 16)
 
 # Authors
 
-- **Johan Zicola** [johanzi](https://github.com/johanzi)
-- **Emmanuel Tergemina**
+- **Johan Zicola** - [johanzi](https://github.com/johanzi)
+- **Emmanuel Tergemina** -
   [EmmanuelTergemina](https://github.com/EmmanuelTergemina)
-- **Ahmed F. Elfarargi**
+- **Ahmed F. Elfarargi** -
   [AhmedElfarargi](https://github.com/AhmedElfarargi)
 
 # License
