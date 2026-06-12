@@ -2,7 +2,7 @@ High impact mutations drive DNA methylation variation after colonization
 of a novel habitat
 ================
 Johan Zicola
-2026-04-14 08:12:30
+2026-06-12 12:13:22
 
 - [Overview](#overview)
 - [Softwares required](#softwares-required)
@@ -36,7 +36,9 @@ Johan Zicola
     - [Whole genome](#whole-genome)
     - [Genes](#genes)
     - [Plot gene body methylation all world (figure
-      1)](#plot-gene-body-methylation-all-world-figure-1)
+      1b)](#plot-gene-body-methylation-all-world-figure-1b)
+    - [Map of the world (Figure 1a)](#map-of-the-world-figure-1a)
+    - [Map of Santo Antao (Figure 1a)](#map-of-santo-antao-figure-1a)
     - [All TEs](#all-tes)
     - [Long TEs](#long-tes)
   - [TE methylation compared to world-wide accessions (figure
@@ -112,7 +114,16 @@ Johan Zicola
   - [Prepare output from GWAS for
     Bowtie2](#prepare-output-from-gwas-for-bowtie2)
   - [Map kmers to TAIR10](#map-kmers-to-tair10)
-  - [Manhattan plot](#manhattan-plot)
+  - [Manhattan plots](#manhattan-plots)
+    - [Figure 2b](#figure-2b)
+    - [Figure S1a](#figure-s1a)
+    - [Figure S1b](#figure-s1b)
+  - [Kmer mapping in the four CVI
+    assemblies](#kmer-mapping-in-the-four-cvi-assemblies)
+    - [Identify coordinates VIM2/4 and VIM3 in the four
+      assemblies](#identify-coordinates-vim24-and-vim3-in-the-four-assemblies)
+    - [Blast kmer on the five
+      assemblies](#blast-kmer-on-the-five-assemblies)
 - [DMR analysis for VIM2](#dmr-analysis-for-vim2)
   - [Pooling of the data](#pooling-of-the-data)
   - [Run Bismark](#run-bismark-1)
@@ -660,6 +671,7 @@ We have a total of 31,189 TEs, including 1,235 TEs bigger than 4 kb.
 
 library(scatterpie)
 library(plyr)
+library(ggmap)
 
 # Load the R script functions_methylkit.R which contains wrap up functions to run in batch several
 # methylKit functions
@@ -851,7 +863,7 @@ load_df_wml(path_DB, df_name)
 ggplot_all(df_mean_genes, title = title)
 ```
 
-### Plot gene body methylation all world (figure 1)
+### Plot gene body methylation all world (figure 1b)
 
 ``` r
 require(gghighlight)
@@ -872,10 +884,6 @@ load_df_wml(path_DB, df_name)
 df <- merge(df_mean_genes, df_accessions, by="sample")
 
 # Use dplyr prefix as desc function is also in IRange, which creates a conflict
-df_subset <- df %>% group_by(country_code) %>% 
-  filter(context=="CpG", country_code!="USA", name!="SRR771702") %>% 
-  filter(n() > 7) %>%  arrange(-dplyr:::desc(Latitude))
-
 df_subset <- df %>% group_by(country_code) %>% 
   filter(context=="CpG", !(country_code %in% c("USA","CPV-FO")), name!="SRR771702") %>% filter(n() > 7) %>% 
   arrange(-dplyr:::desc(Latitude))
@@ -931,6 +939,99 @@ ggplot(data=df_subset, aes(x=country_code, y=percent_methylation)) + geom_boxplo
 ```
 
 ![](images/figure1.png)
+
+### Map of the world (Figure 1a)
+
+``` r
+df_accessions <- read.table("data/accessions_analysis_1001_Africa.txt",
+                            header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
+
+df_accessions$Latitude <- as.double(levels(df_accessions$Latitude)[df_accessions$Latitude])
+df_accessions$Longitude <- as.double(levels(df_accessions$Longitude)[df_accessions$Longitude])
+
+df_accessions_sub <- df_accessions %>% filter(Latitude > 15 & Latitude < 65) %>% filter(Longitude > -45 & Longitude < 80)
+
+world <- map_data("world")
+
+EU <- world[world$long > -45 & world$long < 80 & world$lat > 15 & world$lat < 65, ]
+
+p <- ggplot(EU, aes(long, lat)) +
+  geom_map(map = world, aes(map_id = region), fill = NA, color = "black") +
+  coord_quickmap() + theme_bw() + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+p +  geom_point(data = df_accessions_sub, aes(x = Longitude, y = Latitude), color = "black", size = 1)
+```
+
+![](images/map_accessions_eurasia_bw.png)
+
+``` r
+df_accessions <- read.table("data/accessions_analysis_1001_Africa.txt",
+                            header = TRUE, sep="\t", stringsAsFactors = TRUE, na.strings="")  
+
+df_accessions$Latitude <- as.double(levels(df_accessions$Latitude)[df_accessions$Latitude])
+df_accessions$Longitude <- as.double(levels(df_accessions$Longitude)[df_accessions$Longitude])
+
+range <- c(left = -45, bottom=10, right=85, top=65)
+
+# Create free account
+register_stadiamaps("46ab633a-fe0d-4a09-b69e-7b6cfc4cce1f", write = FALSE)
+
+#p <- get_stadiamap(range, zoom=5, maptype ="stamen_terrain") %>% ggmap()
+p1 <- get_stadiamap(range, zoom=5, maptype ="stamen_terrain_background") %>% ggmap() 
+
+p1 + geom_point(data = df_accessions, aes(x = Longitude, y = Latitude), color = "black", size = 1)
+```
+
+![](images/map_accessions_eurasia.png)
+
+### Map of Santo Antao (Figure 1a)
+
+``` r
+world <- map_data("world")
+
+SA <- world %>% filter(subregion =="Santo Antao") 
+
+# Remove Cvi as GPS coordinates are not within Santo Antao
+df_accessions_sub <-  df_accessions %>% filter(country_code=="CPV-SA") %>% filter(seq_ID!="6911")
+
+p <- ggplot(SA, aes(long, lat)) +
+  geom_map(map = world, aes(map_id = region), fill = NA, color = "black") +
+  coord_quickmap() +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+p +  geom_point(data = df_accessions_sub, aes(x = Longitude, y = Latitude), color = "black", size = 1)
+```
+
+![](images/map_accessions_SA_bw.png)
+
+``` r
+df_accessions <- read.table("data/accessions_analysis_1001_Africa.txt",
+  header = TRUE, sep = "\t", stringsAsFactors = TRUE, na.strings = ""
+)
+
+df_accessions$Latitude <- as.double(levels(df_accessions$Latitude)[df_accessions$Latitude])
+df_accessions$Longitude <- as.double(levels(df_accessions$Longitude)[df_accessions$Longitude])
+
+df_accessions_sub <- df_accessions %>%
+  filter(country_code == "CPV-SA") %>%
+  filter(seq_ID != "6911")
+
+range <- c(left = -25.10, bottom = 17.09, right = -25.01, top = 17.135)
+
+SA <- world %>% filter(subregion == "Santo Antao")
+
+range <- c(left = min(SA$long) - 0.1, bottom = min(SA$lat) - 0.05, right = max(SA$long) + 0.1, top = max(SA$lat) + 0.05)
+
+# Create free account on https://stadiamaps.com/ and get an API 
+register_stadiamaps("46ab633a-fe0d-4a09-b69e-7b6cfc4cce1f", write = FALSE)
+
+p1 <- get_stadiamap(range, zoom = 12, maptype = "stamen_terrain_background") %>% ggmap()
+
+p1 + geom_point(data = df_accessions_sub, aes(x = Longitude, y = Latitude), color = "black", size = 1.5)
+```
+
+![](images/map_accessions_SA.png)
 
 ### All TEs
 
@@ -2731,9 +2832,6 @@ df_fbx5$allele <- as.factor("FBX5")
 
 df_all_alleles <- rbind(df_vim2, df_cmt2, df_fbx5)
 
-
-#
-
 df_cmt2_coord$population_nb <- paste(df_cmt2_coord$population, " n=", df_cmt2_coord$total, sep="")
 
 # Remove Cvi
@@ -2741,8 +2839,6 @@ df <- df_cmt2_coord[!(df_cmt2_coord$population=="Cvi"),]
 
 # Order accesstion by longitude
 df$population_nb <- factor(df$population_nb, levels = df$population_nb[order(df$long)], ordered=TRUE)
-
-
 
 ########## Plot
 
@@ -2785,7 +2881,6 @@ df_mean$FBX5 <- as.factor(df_mean$FBX5)
 df_mean$CMT2 <- as.factor(df_mean$CMT2)
 df_mean$VIM2 <- as.factor(df_mean$VIM2)
 
-
 ggplot_per_context <- function(df, context, group){
   
   give.n <- function(x){
@@ -2820,7 +2915,6 @@ bartlett.test(percent_methylation~VIM2, data=df_mean[(df_mean$context=="CpG"),])
 # Variances not equal => use Welch's test
 
 welch.test(percent_methylation~VIM2, data = df_mean[(df_mean$context=="CpG"),], alpha=0.05)
-
 
 with(df_mean[(df_mean$context=="CpG"),], t.test(percent_methylation[VIM2==0], percent_methylation[VIM2==1], var.equal=FALSE))
 
@@ -2976,7 +3070,6 @@ bartlett.test(percent_methylation~FBX5, data=df_mean[(df_mean$context=="CHG"),])
 
 with(df_mean[(df_mean$context=="CHG"),], t.test(percent_methylation[FBX5==0], percent_methylation[FBX5==1], var.equal=TRUE))
 ```
-
 
         Bartlett test of homogeneity of variances
 
@@ -3440,7 +3533,7 @@ Supplementary Table 14 for ENA accession numbers).
 
 ## Running KMC
 
-`kmers_methylome.SA.sh`
+`scripts/kmersGWAS/kmers_methylome.SA.sh`
 
 ``` bash
 
@@ -3472,7 +3565,7 @@ ${BIN}kmers_add_strand_information -c ${DIR}samples/$sample/kmc_canon \
 rm ${DIR}samples/$sample/*.kmc*
 ```
 
-Use an lsf array to use `kmers_methylome.SA.sh`:
+Run in LSF array `kmers_methylome.SA.sh` across all 83 accessions:
 
 ``` bash
 bsub -q normal -R "rusage[mem=15000]" \
@@ -3489,7 +3582,7 @@ cat ./samples.txt | awk '{printf "'$DIR'/%s/kmers_with_strand\t%s\n",$1,$1}' > k
 
 ## Filter k-mers from separate lists to one list with all k-mers to use
 
-`combine_kmers_methylome_SA.sh`
+`scripts/kmersGWAS/combine_kmers_methylome_SA.sh`
 
 ``` bash
 
@@ -3519,7 +3612,7 @@ bsub -q multicore20 -R "rusage[mem=2000]" -M 5000 -n 15 -J "kmers[1-20]%3" < /ho
 ## Prepare output from GWAS for Bowtie2
 
 Convert the *pass_threshold_10per* file of each phenotype into a
-multifasta file for bowtie2 alignment
+multifasta file for bowtie2 alignment.
 
 ``` bash
 python convertKmers4mapping.py
@@ -3531,10 +3624,566 @@ python convertKmers4mapping.py
 python map_kmers_methylome_SA.py
 ```
 
-## Manhattan plot
+## Manhattan plots
 
-The plotting was performed on a Jupyter notebook. See
-[Methylome_plotting_202450610.ipynb](scripts/kmersGWAS/Methylome_plotting_202450610.html).
+The plotting was performed on a Jupyter notebook.
+
+``` python
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.ticker import FormatStrFormatter
+from matplotlib.ticker import MaxNLocator
+import matplotlib.ticker as ticker
+import matplotlib.patches as mpatches
+```
+
+``` python
+genome=[30427671,19698289,23459830,18585056,26975502]
+space=2000000
+chr1=30427671 / 2 
+chr2=30427671 + 19698289 / 2 + space
+chr3=30427671 + 19698289 + 23459830 / 2 + space * 2
+chr4=30427671 + 19698289 + 23459830 + 18585056 / 2 + space * 3
+chr5=30427671 + 19698289 + 23459830 + 18585056 + 26975502 / 2 + space * 4
+```
+
+### Figure 2b
+
+``` python
+start = 24580000
+end = 24625000
+
+def parse_classical_GWAS(file):
+    df = pd.read_table(file)
+    df['P'] = -(np.log10(df['p_lrt']))
+    df['P_bi'] = (np.log10(df['p_lrt']))
+    space=2000000
+    df['position'] = np.select([df['chr'] == 1, 
+                                                df['chr'] == 2, 
+                                                df['chr'] == 3, 
+                                                df['chr'] == 4, 
+                                                df['chr'] == 5],
+                        [df['ps'], 
+                        df['ps'] + 30427671 + space, 
+                        df['ps'] + 30427671 + 19698289 + space * 2,
+                        df['ps'] + 30427671 + 19698289 + 23459830 + space * 3,
+                        df['ps'] + 30427671 + 19698289 + 23459830 + 18585056 + space * 4])
+    return(df)
+
+def zoom_classical_GWAS(df):    
+    return(df.loc[(df['chr'] == 1) &(df['ps'] > start) & (df['ps'] < end)])
+
+def zoom_kmer_GWAS(file):
+    df = pd.read_table(file)
+    df['Chr_S1-1'] = df['Chr_S1-1'].str.lower()
+    df = df[df['MP_TAIR10'] >= 24]
+    df['P'] = -(np.log10(df['p_lrt']))
+    space=2000000
+    df['position'] = np.select([df['Chr_TAIR10'] == 'chr1', df['Chr_TAIR10'] == 'chr2', df['Chr_TAIR10'] == 'chr3', df['Chr_TAIR10'] == 'chr4', df['Chr_TAIR10'] == 'chr5'],
+                        [df['Pos_TAIR10'], 
+                        df['Pos_TAIR10'] + 30427671 + space, 
+                        df['Pos_TAIR10'] + 30427671 + 19698289 + space * 2,
+                        df['Pos_TAIR10'] + 30427671 + 19698289 + 23459830 + space * 3,
+                        df['Pos_TAIR10'] + 30427671 + 19698289 + 23459830 + 18585056 + space * 4])
+    return(df.loc[(df['Chr_TAIR10'] == 'chr1') & (df['Pos_TAIR10'] > start) & (df['Pos_TAIR10'] < end)])
+
+gw_snp=parse_classical_GWAS('CpG_genes.assoc.txt')
+snp=zoom_classical_GWAS(gw_snp)
+kmer=zoom_kmer_GWAS('CpG_genes.kmers.assoc.txt')
+
+kmer['CVI-0_mapped']=np.select([kmer['Chr_Cvi-0'] == '*'],['No'],'Yes')
+
+
+def major_formatter(x, pos):
+    y = x /1000000
+    return "%.2f" % y
+cm = 1/2.54
+fig = plt.figure(figsize=(7*cm,4*cm))
+ax=sns.scatterplot(x='Pos_TAIR10',
+                y='P',
+                data=kmer,
+                color='0',
+                marker='+',
+                hue='CVI-0_mapped',
+                hue_order=['Yes','No'],
+                palette=["gold", "red"],
+                s=20,
+                legend=False)
+ax=sns.scatterplot(x='ps',
+                y='P',
+                data=snp,
+                palette='cividis',
+                marker='o',
+                color='0',
+                s=20,
+                linewidth=0)
+plt.hlines(y=-np.log10(0.05/len(gw_snp)),
+             xmin=min(gw_snp['position']),
+             xmax=max(gw_snp['position']),
+             color='0',
+             linestyle='--',
+             linewidth=1,
+             zorder=1)
+ax.annotate(r'$\itVIM4$',xy=(24586760, 21),xytext=(24586760-8000,21.5))
+ax.annotate(r'$\itVIM2$',xy=(24589343, 21),xytext=(24589343,21.5))
+ax.xaxis.set_major_formatter(major_formatter)
+ax.xaxis.set_major_locator(ticker.MultipleLocator(10000))
+plt.xlabel('Position in Mb',fontsize=10)
+plt.ylabel('-log$_{10}$($\itP$)',fontsize=10)
+arrow1 = mpatches.FancyArrowPatch((24586760, 20), (24583740, 20),mutation_scale=10,color='0')
+ax.add_patch(arrow1)
+arrow2 = mpatches.FancyArrowPatch((24589343, 20), (24592780, 20),mutation_scale=10,color='0')
+ax.add_patch(arrow2)
+plt.xlim(start,end+5000)
+plt.ylim(0,21)
+sns.despine(trim=True)
+plt.tick_params(labelsize=8)
+plt.savefig("Fig2b_20260809.pdf", format="pdf",bbox_inches="tight")
+```
+
+![](images/output_3_0.png)
+
+### Figure S1a
+
+``` python
+def parse_classical_GWAS(file):
+    df = pd.read_table(file)
+    df['P'] = -(np.log10(df['p_lrt']))
+    df['P_bi'] = (np.log10(df['p_lrt']))
+    space=2000000
+    df['position'] = np.select([df['chr'] == 1, 
+                                                df['chr'] == 2, 
+                                                df['chr'] == 3, 
+                                                df['chr'] == 4, 
+                                                df['chr'] == 5],
+                        [df['ps'], 
+                        df['ps'] + 30427671 + space, 
+                        df['ps'] + 30427671 + 19698289 + space * 2,
+                        df['ps'] + 30427671 + 19698289 + 23459830 + space * 3,
+                        df['ps'] + 30427671 + 19698289 + 23459830 + 18585056 + space * 4])
+    
+    return(df)
+
+def parse_kmer_GWAS(file):
+    df = pd.read_table(file)
+    df['Chr_S1-1'] = df['Chr_S1-1'].str.lower()
+    df = df[df['MP_TAIR10'] >= 24]
+    df['P'] = -(np.log10(df['p_lrt']))
+    space=2000000
+    df['position'] = np.select([df['Chr_TAIR10'] == 'chr1', df['Chr_TAIR10'] == 'chr2', df['Chr_TAIR10'] == 'chr3', df['Chr_TAIR10'] == 'chr4', df['Chr_TAIR10'] == 'chr5'],
+                        [df['Pos_TAIR10'], 
+                        df['Pos_TAIR10'] + 30427671 + space, 
+                        df['Pos_TAIR10'] + 30427671 + 19698289 + space * 2,
+                        df['Pos_TAIR10'] + 30427671 + 19698289 + 23459830 + space * 3,
+                        df['Pos_TAIR10'] + 30427671 + 19698289 + 23459830 + 18585056 + space * 4])
+#     return(df)
+    return(df)
+
+snp=parse_classical_GWAS('CpG_genes.assoc.txt')
+kmer=parse_kmer_GWAS('CpG_genes.kmers.assoc.txt')
+top_SNP=snp.loc[(snp['chr'] == 1) & (snp['ps'] == 24622585)]
+
+        
+def major_formatter(x, pos):
+    y = x /1000000
+    return "%.1f" % y
+cm = 1/2.54
+fig = plt.figure(figsize=(14*cm,4*cm))
+ax = sns.scatterplot(x='position',
+                y='P',
+                data=snp,
+                hue='chr',
+                palette=['dimgray','silver','dimgray','silver','dimgray'],
+                marker='o',
+                s=12,
+                linewidth=0,
+                legend=False)
+ax=sns.scatterplot(x='position',
+                y='P',
+                data=kmer,
+                color='0',
+                marker='+',
+                s=20,
+                legend=False)
+ax = sns.scatterplot(x='ps',
+                y='P',
+                data=top_SNP,
+                color='purple',
+                marker='D',
+                s=20,
+                linewidth=0)
+ax.hlines(y=-np.log10(0.05/len(snp)),
+             xmin=min(snp['position']),
+             xmax=max(snp['position']),
+             color='0',
+             linestyle='--',
+             linewidth=1,
+#              alpha=0.4,
+             zorder=1)
+ax.vlines(24583740,
+          0,
+          20,
+          colors='0',
+          zorder=1,
+          linestyle='--',
+          linewidth=1)
+ax.annotate(r'$\itVIM2/4$',xy=(24586760, 20),xytext=(24586760-9500000,20.5))
+ax.annotate(r'$\itVIM3$',xy=(15837178 + 30427671 + 19698289 + 23459830 + 18585056 + space * 4, 20),xytext=(15837178 + + 30427671 + 19698289 + 23459830 + 18585056 + space * 4 -5000000,20.5))
+ax.vlines(15837178 + 30427671 + 19698289 + 23459830 + 18585056 + space * 4,
+          0,
+          20,
+          colors='0',
+          zorder=1,
+          linestyle='--',
+          linewidth=1)
+ax.yaxis.set_major_formatter(FormatStrFormatter('%.0f'))
+plt.xlabel('Chromosome',fontsize=10)
+plt.ylim(0,20)
+plt.ylabel('-log$_{10}$($\itP$)',fontsize=10)
+plt.xticks([chr1,chr2,chr3,chr4,chr5],["Chr1", "Chr2", "Chr3", "Chr4", "Chr5"])
+sns.despine(trim=True)
+plt.tick_params(labelsize=8)
+plt.savefig("FigSup1a_20260809.pdf", format="pdf",bbox_inches="tight")
+```
+
+![](images/output_5_0.png)
+
+### Figure S1b
+
+``` python
+start = 14073198
+end = 16043404
+
+def parse_classical_GWAS(file):
+    df = pd.read_table(file)
+    df['P'] = -(np.log10(df['p_lrt']))
+    df['P_bi'] = (np.log10(df['p_lrt']))
+    space=2000000
+    df['position'] = np.select([df['chr'] == 1, 
+                                                df['chr'] == 2, 
+                                                df['chr'] == 3, 
+                                                df['chr'] == 4, 
+                                                df['chr'] == 5],
+                        [df['ps'], 
+                        df['ps'] + 30427671 + space, 
+                        df['ps'] + 30427671 + 19698289 + space * 2,
+                        df['ps'] + 30427671 + 19698289 + 23459830 + space * 3,
+                        df['ps'] + 30427671 + 19698289 + 23459830 + 18585056 + space * 4])
+    return(df)
+
+def zoom_classical_GWAS(df):    
+    return(df.loc[(df['chr'] == 5) &(df['ps'] > start) & (df['ps'] < end)])
+
+def zoom_kmer_GWAS(file):
+    df = pd.read_table(file)
+    df['Chr_S1-1'] = df['Chr_S1-1'].str.lower()
+    df = df[df['MP_TAIR10'] >= 24]
+    df['P'] = -(np.log10(df['p_lrt']))
+    space=2000000
+    df['position'] = np.select([df['Chr_TAIR10'] == 'chr1', df['Chr_TAIR10'] == 'chr2', df['Chr_TAIR10'] == 'chr3', df['Chr_TAIR10'] == 'chr4', df['Chr_TAIR10'] == 'chr5'],
+                        [df['Pos_TAIR10'], 
+                        df['Pos_TAIR10'] + 30427671 + space, 
+                        df['Pos_TAIR10'] + 30427671 + 19698289 + space * 2,
+                        df['Pos_TAIR10'] + 30427671 + 19698289 + 23459830 + space * 3,
+                        df['Pos_TAIR10'] + 30427671 + 19698289 + 23459830 + 18585056 + space * 4])
+    return(df.loc[(df['Chr_TAIR10'] == 'chr5') & (df['Pos_TAIR10'] > start) & (df['Pos_TAIR10'] < end)])
+
+gw_snp=parse_classical_GWAS('CpG_genes.assoc.txt')
+snp=zoom_classical_GWAS(gw_snp)
+kmer=zoom_kmer_GWAS('CpG_genes.kmers.assoc.txt')
+Chr5_15047549_ld=pd.read_table('Chr5_15047549.ld', sep = '\s+')
+
+zoom=pd.merge(snp,Chr5_15047549_ld,left_on='ps',right_on='BP_B')
+zoom.head()
+
+        
+def major_formatter(x, pos):
+    y = x /1000000
+    return "%.1f" % y
+cm = 1/2.54
+fig = plt.figure(figsize=(15*cm,10*cm))
+ax=sns.scatterplot(x='Pos_TAIR10',
+                y='P',
+                data=kmer,
+                color='0',
+                marker='+',
+                s=20,
+                legend=False)
+ax=sns.scatterplot(x='ps',
+                y='P',
+                data=zoom,
+                palette='cividis',
+                hue='R2',
+                marker='o',
+                s=20,
+                linewidth=0)
+plt.hlines(y=-np.log10(0.05/len(gw_snp)),
+             xmin=min(gw_snp['position']),
+             xmax=max(gw_snp['position']),
+             color='0',
+             linestyle='--',
+             linewidth=1,
+             zorder=1)
+ax.set_xlim(start,end)
+ax.xaxis.set_major_formatter(major_formatter)
+ax.yaxis.set_major_formatter(FormatStrFormatter('%.0f'))
+plt.xlabel('Position in Mb',fontsize=10)
+plt.ylabel('-log$_{10}$($\itP$)',fontsize=10)
+ax.annotate(r'VIM3',xy=(15837178, 19),xytext=(15837178-300000,19),arrowprops=dict(facecolor='black',arrowstyle="-|>"),zorder=7)
+ax.vlines(15837178,0,19,colors='r',zorder=0)
+sns.despine(trim=True)
+plt.tick_params(labelsize=8)
+norm = plt.Normalize(zoom['R2'].min(), zoom['R2'].max())
+sm = plt.cm.ScalarMappable(norm=norm,cmap='cividis')
+ax.get_legend().remove()
+cbar=ax.figure.colorbar(sm,pad=0.05,shrink=0.5)
+cbar.ax.set_title("LD (D')", fontsize=10, pad=10, x=1.2)
+plt.savefig("FigSup1b_20260809.pdf", format="pdf",bbox_inches="tight")
+```
+
+![](images/output_7_0.png)
+
+## Kmer mapping in the four CVI assemblies
+
+### Identify coordinates VIM2/4 and VIM3 in the four assemblies
+
+We first identified the positions of VIM2/4 and VIM3 in the four CVI
+assemblies we generated: Cvi-0, S1-1, S5-10, and S15-3
+
+Download the fasta files of these accession on NCBI (BioProject
+PRJNA1112558).
+
+For this, we used blastn.
+
+Get TAIR10 assembly from www.arabidopsis.org
+(<https://www.arabidopsis.org/download/file?path=Genes/TAIR10_genome_release/TAIR10_chromosome_files/TAIR10_chr_all.fas.gz>)
+
+``` bash
+# Rename chromosome
+gunzip TAIR10_chr_all.fas.gz
+
+# Replace chromosome names to add prefix Chr
+sed 's/^>\([1-5]\)/>Chr\1/g' TAIR10_chr_all.fas > TAIR10.fa
+```
+
+Build blastn indexes for the five assemblies:
+
+``` bash
+# Make blast DB
+for i in *fasta; do 
+  makeblastdb -in $i -dbtype nucl -out ${i%.*}
+done
+```
+
+#### VIM4 coordinates
+
+AT1G66040
+
+Get full gDNA sequence from Col-0 on
+<https://www.arabidopsis.org/sequence?key=1002494865> (fasta file in
+`data/fasta_files/VIM4_gDNA_TAIR10.fa`)
+
+``` bash
+
+blastn -version
+blastn: 2.2.27+
+
+# Blast gDNA sequence
+for i in *fasta; do
+ blastn -query VIM4_gDNA_TAIR10.fa -db ${i%.*} -outfmt 6 > vim4_TAIR10_${i%.*}.blast
+done
+
+# Start coordinates
+for i in vim4_*_unmasked.blast; do grep "Chr1" $i  | sort -k7 | head -n1 | cut -f2,9; done
+Chr1    25129235
+Chr1    25173075
+Chr1    25149867
+Chr1    25131477
+
+
+
+# Stop coordinates => tricky because VIM2 5' is very close to VIM4 5'
+# Choose value manually based on VIM2 start positions
+25129235
+25173075
+25149867
+25131477
+```
+
+#### VIM2 coordinates
+
+AT1G66050
+
+Get gDNA sequence from Col-0 on
+<https://www.arabidopsis.org/sequence?key=2002965408> (fasta file in
+`data/fasta_files/VIM2_gDNA_TAIR10.fa`)
+
+``` bash
+
+# Blast
+for i in *fasta; do
+ blastn -query VIM2_gDNA_TAIR10.fa -db ${i%.*} -outfmt 6 > vim2_TAIR10_${i%.*}.blast
+done
+
+# Start coordinates
+for i in vim2_*_unmasked.blast; do grep "Chr1" $i  | sort -k7 | head -n1 | cut -f2,9; done
+Chr1    25132496
+Chr1    25178990
+Chr1    25155780
+Chr1    25134739
+
+
+# Stop coordinates
+for i in vim2_*_unmasked.blast; do grep "Chr1" $i  | sort -k10 | tail -n1 | cut -f2,10; done
+Chr1    25135833
+Chr1    25182474
+Chr1    25159265
+Chr1    25138076
+```
+
+#### VIM3 coordinates
+
+AT5G39550
+
+Get gDNA sequence from Col-0 in
+<https://www.arabidopsis.org/sequence?key=2503953419> (fasta file in
+`data/fasta_files/VIM3_gDNA_TAIR10.fa`).
+
+``` bash
+
+for i in *fasta; do
+ blastn -query VIM3_gDNA_TAIR10.fa -db ${i%.*} -outfmt 6 > vim3_TAIR10_${i%.*}.blast
+done
+
+for i in vim3_TAIR10_*.blast; do
+echo $i
+head -n 1 $i
+done
+
+for i in *fasta; do echo $i;  blastn -query $VIM3_TAIR10 -db ${i%.*} -outfmt 6 | head -n 1 | cut -f2,9,10; done
+
+CVI-0_unmasked.fasta
+Chr5    15556114        15559612
+S1-1_unmasked.fasta
+Chr5    15834646        15838144
+S15-3_unmasked.fasta
+Chr5    15742749        15746247
+S5-10_unmasked.fasta
+Chr5    15837351        15840849
+TAIR10.fasta
+chr5    15837177        15840678
+```
+
+#### Summary positions VIMs in the five assemblies
+
+VIM4
+
+| assembly | chr  | start      | end        | length |
+|----------|------|------------|------------|--------|
+| Cvi-0    | chr1 | 25,129,235 | 25,132,504 | 3,269  |
+| S1-1     | chr1 | 25,173,075 | 25,176,360 | 3,285  |
+| S15-3    | chr1 | 25,149,867 | 25,153,150 | 3,283  |
+| S5-10    | chr1 | 25,131,477 | 25,134,747 | 3,270  |
+| TAIR10   | chr1 | 24,583,740 | 24,586,760 | 3,020  |
+
+VIM2
+
+| assembly | chr  | start      | end        | length |
+|----------|------|------------|------------|--------|
+| Cvi-0    | chr1 | 25,132,496 | 25,135,833 | 3,337  |
+| S1-1     | chr1 | 25,178,990 | 25,182,474 | 3,484  |
+| S15-3    | chr1 | 25,155,780 | 25,159,265 | 3,485  |
+| S5-10    | chr1 | 25,134,739 | 25,138,076 | 3,337  |
+| TAIR10   | chr1 | 24,589,342 | 24,592,780 | 3,438  |
+
+Note that VIM4 gDNA regions are longer in CVI due to some
+TAIR10-specific deletions present in the first intron.
+
+VIM3
+
+| assembly | chr  | start      | end        | length |
+|----------|------|------------|------------|--------|
+| Cvi-0    | chr5 | 15,556,114 | 15,559,612 | 3,498  |
+| S1-1     | chr5 | 15,834,646 | 15,838,144 | 3,498  |
+| S15-3    | chr5 | 15,742,749 | 15,746,247 | 3,498  |
+| S5-10    | chr5 | 15,837,351 | 15,840,849 | 3,498  |
+| TAIR10   | chr5 | 15,837,177 | 15,840,678 | 3,501  |
+
+### Blast kmer on the five assemblies
+
+``` bash
+
+# Build bowtie index for the four CVI assemblies and TAIR10 Col-0
+for i in *fasta; do
+  bowtie-build -f $i ${i%%.*} &
+done
+
+# Map kmer 2571 (most significant mapping on chr5 with one mismatch in TAIR10)
+for i in *fasta; do
+  bowtie ${i%%.*} -c AAACAGTTATTTTCCATTAAACCACCACTAA --all > kmer_2571_mapping_all_${i%%.*}.sam
+done
+
+# reads processed: 1
+# reads with at least one reported alignment: 1 (100.00%)
+# reads that failed to align: 0 (0.00%)
+Reported 1 alignments
+# reads processed: 1
+# reads with at least one reported alignment: 1 (100.00%)
+# reads that failed to align: 0 (0.00%)
+Reported 2 alignments
+# reads processed: 1
+# reads with at least one reported alignment: 1 (100.00%)
+# reads that failed to align: 0 (0.00%)
+Reported 2 alignments
+# reads processed: 1
+# reads with at least one reported alignment: 1 (100.00%)
+# reads that failed to align: 0 (0.00%)
+Reported 1 alignments
+# reads processed: 1
+# reads with at least one reported alignment: 1 (100.00%)
+# reads that failed to align: 0 (0.00%)
+Reported 2 alignments
+
+for i in kmer_2571_mapping_all*; do
+  echo $i; cat $i | cut -f3,4,8
+done
+
+kmer_2571_mapping_all_CVI-0_unmasked.sam
+Chr5    15559705        16:G>A
+kmer_2571_mapping_all_S1-1_unmasked.sam
+Chr1    25176565
+Chr5    15838237        16:G>A
+kmer_2571_mapping_all_S15-3_unmasked.sam
+Chr1    25153355
+Chr5    15746340        16:G>A
+kmer_2571_mapping_all_S5-10_unmasked.sam
+Chr5    15840942        16:G>A
+kmer_2571_mapping_all_TAIR10.sam
+chr5    15840771        16:G>A
+chr1    24586963        5:A>C,16:T>A
+```
+
+kmer at VIM2/4 promoter region:
+
+| assembly | VIM4 5’ | VIM2 5’ | distance | kmer location | in between? | distance from VIM4 |
+|----|----|----|----|----|----|----|
+| Cvi-0 | 25,132,504 | 25,132,496 | -8 |  |  |  |
+| S1-1 | 25,176,360 | 25,178,990 | 2,630 | 25,176,565 | Yes | 205 |
+| S15-3 | 25,153,150 | 25,155,780 | 2,630 | 25,153,355 | Yes | 205 |
+| S5-10 | 25,134,747 | 25,134,739 | -8 |  |  |  |
+| TAIR10 | 24,586,760 | 24,589,342 | 2,582 | 24,586,964 |  | 204 |
+
+kmer at VIM3 promoter region:
+
+| assembly | 5’ end     | kmer location | distance |
+|----------|------------|---------------|----------|
+| Cvi-0    | 15,559,612 | 15,559,705    | 93       |
+| S1-1     | 15,838,144 | 15,838,237    | 93       |
+| S15-3    | 15,746,247 | 15,746,340    | 93       |
+| S5-10    | 15,840,849 | 15,840,942    | 93       |
+| TAIR10   | 15,840,678 | 15,840,771    | 93       |
 
 # DMR analysis for VIM2
 
@@ -5409,8 +6058,7 @@ done
 
 ``` bash
 
-# Download fasta file
-wget https://www.arabidopsis.org/download_files/Genes/TAIR10_genome_release/TAIR10_chromosome_files/TAIR10_chr_all.fas -O TAIR10.fa
+# Download fasta file https://www.arabidopsis.org/download/file?path=Genes/TAIR10_genome_release/TAIR10_chromosome_files/TAIR10_chr_all.fas.gz
 
 # Replace chromosome names to add prefix Chr
 sed -i 's/^>\([1-5]\)/>Chr\1/g' TAIR10.fa
@@ -6649,7 +7297,6 @@ TAIR10_TE.fas  FASTA   DNA     31,189  23,315,940       10    747.6   31,019
 /home/zicola/TAIR10_annotations/TAIR10_Transposable_Elements_EvaFormat.bed
 
 # Get only overlapping
-
 cd /srv/netscratch/irg/grp_hancock/johan/TE_mapping
 
 cp /home/zicola/TAIR10_annotations/TAIR10_TE.fas .
