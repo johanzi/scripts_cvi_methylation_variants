@@ -2,7 +2,7 @@ High impact mutations drive DNA methylation variation after colonization
 of a novel habitat
 ================
 Johan Zicola
-2026-06-12 12:13:22
+2026-06-15 10:38:59
 
 - [Overview](#overview)
 - [Softwares required](#softwares-required)
@@ -53,6 +53,18 @@ Johan Zicola
   - [Download raw fastq reads whole-genome
     sequencing](#download-raw-fastq-reads-whole-genome-sequencing)
   - [SNP calling](#snp-calling)
+    - [SHORE pipeline](#shore-pipeline)
+    - [Required softwares](#required-softwares)
+    - [Alignment](#alignment)
+    - [Generate index files for BWA](#generate-index-files-for-bwa)
+    - [Perform the alignment](#perform-the-alignment)
+    - [Convert SAM file to MapList
+      format](#convert-sam-file-to-maplist-format)
+    - [Convert fasta reference in SHORE
+      format](#convert-fasta-reference-in-shore-format)
+    - [Call SNPs](#call-snps)
+    - [Convert SHORE output to VCF](#convert-shore-output-to-vcf)
+    - [Merge several VCF file](#merge-several-vcf-file)
   - [SNP annotation in CVI](#snp-annotation-in-cvi)
   - [Prepare VCF file for the 83 CVI
     accession](#prepare-vcf-file-for-the-83-cvi-accession)
@@ -122,8 +134,8 @@ Johan Zicola
     assemblies](#kmer-mapping-in-the-four-cvi-assemblies)
     - [Identify coordinates VIM2/4 and VIM3 in the four
       assemblies](#identify-coordinates-vim24-and-vim3-in-the-four-assemblies)
-    - [Blast kmer on the five
-      assemblies](#blast-kmer-on-the-five-assemblies)
+    - [Mapping kmer on the five
+      assemblies](#mapping-kmer-on-the-five-assemblies)
 - [DMR analysis for VIM2](#dmr-analysis-for-vim2)
   - [Pooling of the data](#pooling-of-the-data)
   - [Run Bismark](#run-bismark-1)
@@ -1604,7 +1616,132 @@ It took about 10 to 40 minutes per sample to download.
 ## SNP calling
 
 The SNP calling is described in the GitHub repository
-<https://github.com/johanzi/SNP_calling_Arabidopsis>
+<https://github.com/johanzi/SNP_calling_Arabidopsis> and a copy of the
+script is provided here:
+
+### SHORE pipeline
+
+This pipeline is based on SHORE ([Ossowski et al.,
+2008](https://genome.cshlp.org/content/18/12/2024.long)). Check
+documentation [here](http://shore.sourceforge.net/wiki/). The pipeline
+described here derived from [Durvasula et al.,
+2017](https://www.pnas.org/content/114/20/5213) with minor
+modifications.
+
+### Required softwares
+
+- BWA (0.7.5 used)
+- SHORE (0.9.3 used)
+- VCFTOOLS (0.1.14 used)
+
+### Alignment
+
+The first step is to align the data on a reference genome. In this case,
+we use the TAIR10 reference for *Arabidopsis thaliana* (accession
+Col-0). The fasta file can be downloaded on the TAIR10 website:
+
+    # Download fasta file
+    wget https://www.arabidopsis.org/download_files/Genes/TAIR10_genome_release/TAIR10_chromosome_files/TAIR10_chr_all.fas
+
+### Generate index files for BWA
+
+We used BWA for aligning the reads. Check pros and cons for different
+aligner on [SHORE
+wiki](http://shore.sourceforge.net/wiki/index.php/Supported_Short_Read_Aligners).
+
+    # Index fasta file of the reference genome (here <reference.fa> should 
+    # be the TAIR10_chr_all.fas file generated above)
+    bwa index -a bwtsw <reference.fa>
+
+### Perform the alignment
+
+All data used to call SNPs were paired-end.
+
+    # Align the first read of the pairs
+    bwa aln -n 0.1 -o 1 <reference.fa>  <fastq_file_read_1.fastq> -f <fastq_file_read_1.fastq.sai> 
+
+    # Align the second read of the pairs
+    bwa aln -n 0.1 -o 1 <reference.fa>  <fastq_file_read_2.fastq> -f <fastq_file_read_1.fastq.sai> 
+
+    # Repetitive read pairs will be placed randomly. The maximum insert size is 500 bp
+    bwa sampe -a 500 -r "@RG\tID:$SAMPLE_NAME\tSM:$SAMPLE_NAME" <TAIR10.fa> \
+        <fastq_file_read_1.fastq.sai> <fastq_file_read_2.fastq.sai> \
+         <fastq_file_read_1.fastq>  <fastq_file_read_2.fastq> > <alignment.sam>  
+
+### Convert SAM file to MapList format
+
+SHORE cannot process the SAM file derived from the BWA alignment but
+uses a MapList file. Check
+[here](http://shore.sourceforge.net/wiki/index.php/SHORE_File_Formats)
+for more information on SHORE formats.
+
+    # Convert SAM to MapList format 
+    shore convert Alignment2Maplist <alignment.sam> --refseq <reference.fa> > <alignment.map.list>
+
+    # Sort the MapList file
+    shore sort --preset maplist --infiles <file.map.list> --inplace
+
+### Convert fasta reference in SHORE format
+
+SHORE creates from the reference FASTA file mapping indices and
+caculates GC content and sequence complexity. Check more
+[here](http://shore.sourceforge.net/wiki/index.php/Shore_preprocess)
+
+    shore preprocess -C --indexes BWA,SuffixArray --fastafile <reference.fa> --indexfolder <output_directory>
+
+    # Check with Andrea with --indexes parameters, not in documentation http://shore.sourceforge.net/wiki/index.php/Shore_preprocess
+
+The output file which should be used in the next step is named
+`reference.fa.shore`.
+
+### Call SNPs
+
+The `consensus` function identifies polymorphisms (SNPs). See
+documentation
+[here](http://shore.sourceforge.net/wiki/index.php/Shore_consensus). The
+two important out files generated are `quality_variant.txt` and
+`quality_reference.txt`.
+
+    shore/./shore consensus \
+        -n ${numIDactual} \
+        -f <reference.fa.shore>
+        -o <output_directory> \
+        -i <alignment.map.list> \
+        -a <scoring_matrix_hom.txt> \
+        -b 0.7 -g 4 -N
+
+### Convert SHORE output to VCF
+
+The file `quality_variant.txt` and `quality_reference.txt` should be
+converted into VCF file and merged.
+
+    shore convert Variant2VCF <reference.fa> < quality_variant.txt > quality_variant.vcf
+
+    shore convert Variant2VCF <reference.fa> < quality_reference.txt > quality_reference.vcf
+
+Compress the files and do the concatenation
+
+    # Compress files
+    bgzip quality_variant.vcf
+    bgzip quality_reference.vcf
+
+    # Concatenate the 2 files
+    vcf-concat quality_variant.vcf.gz quality_reference.vcf.gz | bgzip -c > <sample_name.vcf.gz>
+
+    # Index file using tabix (generates a file with a .tbi extension) 
+    tabix <sample_name.vcf.gz>
+
+Note: Index VCF files with tabix allows to retrieve quickly a part of
+the file. For instance: `tabix -h <file.vcf.gz> Chr1:100-2000`
+
+### Merge several VCF file
+
+The pipeline described above is performed for each sample. Once all
+samples are processed, one can create a single VCF file containing all
+samples.
+
+    # All vcf files end with the suffix .vcf.gz
+    vcf-merge *.vcf.gz | bgzip -c > merged.vcf.gz
 
 ## SNP annotation in CVI
 
@@ -3852,6 +3989,25 @@ plt.savefig("FigSup1a_20260809.pdf", format="pdf",bbox_inches="tight")
 
 ### Figure S1b
 
+Calculate LD using plink (v1.90b6.26) between the top SNP at chr5
+(chr5:15047549) and the SNPs 1 Mb upstream and downstream of this SNP.
+
+``` bash
+# --ld-window-kb 1000 Sets the maximum physical distance window to 1000 kb (1 Mb) upstream and downstream of the target variant.
+# --ld-window 99999 Sets the maximum number of variants allowed between the target variant and test variants to 99999 (practically eliminating the variant-count limit so physical distance governs the window).
+
+plink --file ${wd}subset_83_only_chr_biallelic_only_alt_DP3_GQ25_wo_singletons \
+--r2 \
+--ld-snp 5:15047549 \
+--ld-window-kb 1000 \
+--ld-window 99999 \
+--ld-window-r2 0 \
+--out Chr5_15047549
+```
+
+This script will generate the file `Chr5_15047549.ld` which will be used
+to generate the plot below:
+
 ``` python
 start = 14073198
 end = 16043404
@@ -3945,6 +4101,9 @@ plt.savefig("FigSup1b_20260809.pdf", format="pdf",bbox_inches="tight")
 
 ![](images/output_7_0.png)
 
+The low LD of the anchored SNP (chr5:15047549) with the surrounding SNPs
+is suspicious and may be due to structural variations.
+
 ## Kmer mapping in the four CVI assemblies
 
 ### Identify coordinates VIM2/4 and VIM3 in the four assemblies
@@ -3955,7 +4114,7 @@ assemblies we generated: Cvi-0, S1-1, S5-10, and S15-3
 Download the fasta files of these accession on NCBI (BioProject
 PRJNA1112558).
 
-For this, we used blastn.
+For this, we used blastn (v2.2.27+).
 
 Get TAIR10 assembly from www.arabidopsis.org
 (<https://www.arabidopsis.org/download/file?path=Genes/TAIR10_genome_release/TAIR10_chromosome_files/TAIR10_chr_all.fas.gz>)
@@ -4111,10 +4270,10 @@ VIM3
 | S5-10    | chr5 | 15,837,351 | 15,840,849 | 3,498  |
 | TAIR10   | chr5 | 15,837,177 | 15,840,678 | 3,501  |
 
-### Blast kmer on the five assemblies
+### Mapping kmer on the five assemblies
 
 ``` bash
-
+# version 1.2.2
 # Build bowtie index for the four CVI assemblies and TAIR10 Col-0
 for i in *fasta; do
   bowtie-build -f $i ${i%%.*} &
@@ -4164,6 +4323,11 @@ kmer_2571_mapping_all_TAIR10.sam
 chr5    15840771        16:G>A
 chr1    24586963        5:A>C,16:T>A
 ```
+
+Sequence kmer in Col-0 at VIM4 promoter (chr1:24586964..24586994):
+TTAGTGGTGGTTTAATGGAAAATAACTGTTT (2 SNPs) Sequence kmer in Col-0 at VIM3
+promoter (chr1:24586964..24586994): TTAGTGGTGGTTTAATGGAAAATAACTGTTT (1
+SNP)
 
 kmer at VIM2/4 promoter region:
 
