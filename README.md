@@ -2,7 +2,7 @@ High impact mutations drive DNA methylation variation after colonization
 of a novel habitat
 ================
 Johan Zicola
-2026-06-15 10:38:59
+2026-06-19 09:25:30
 
 - [Overview](#overview)
 - [Softwares required](#softwares-required)
@@ -65,7 +65,6 @@ Johan Zicola
     - [Call SNPs](#call-snps)
     - [Convert SHORE output to VCF](#convert-shore-output-to-vcf)
     - [Merge several VCF file](#merge-several-vcf-file)
-  - [SNP annotation in CVI](#snp-annotation-in-cvi)
   - [Prepare VCF file for the 83 CVI
     accession](#prepare-vcf-file-for-the-83-cvi-accession)
   - [Prepare phenotype](#prepare-phenotype)
@@ -122,20 +121,25 @@ Johan Zicola
     individuals](#create-k-mers-list-to-be-used-in-gwas-from-all-individuals)
   - [Filter k-mers from separate lists to one list with all k-mers to
     use](#filter-k-mers-from-separate-lists-to-one-list-with-all-k-mers-to-use)
-  - [Run the GWAS](#run-the-gwas)
+  - [Run the kmersGWAS](#run-the-kmersgwas)
   - [Prepare output from GWAS for
     Bowtie2](#prepare-output-from-gwas-for-bowtie2)
   - [Map kmers to TAIR10](#map-kmers-to-tair10)
-  - [Manhattan plots](#manhattan-plots)
-    - [Figure 2b](#figure-2b)
-    - [Figure S1a](#figure-s1a)
-    - [Figure S1b](#figure-s1b)
+  - [Manhattan plots kmersGWAS](#manhattan-plots-kmersgwas)
+    - [kmersGWAS manhattan plot around VIM2/4 (Figure
+      2b)](#kmersgwas-manhattan-plot-around-vim24-figure-2b)
+    - [kmersGWAS manhattan plot (Figure
+      S1a)](#kmersgwas-manhattan-plot-figure-s1a)
+    - [LD of SNPs around chr5:15047549 (Figure
+      S1b)](#ld-of-snps-around-chr515047549-figure-s1b)
   - [Kmer mapping in the four CVI
     assemblies](#kmer-mapping-in-the-four-cvi-assemblies)
     - [Identify coordinates VIM2/4 and VIM3 in the four
       assemblies](#identify-coordinates-vim24-and-vim3-in-the-four-assemblies)
     - [Mapping kmer on the five
       assemblies](#mapping-kmer-on-the-five-assemblies)
+- [LD analysis between VIM2/4 deletion and
+  Chr5_15047549](#ld-analysis-between-vim24-deletion-and-chr5_15047549)
 - [DMR analysis for VIM2](#dmr-analysis-for-vim2)
   - [Pooling of the data](#pooling-of-the-data)
   - [Run Bismark](#run-bismark-1)
@@ -1743,11 +1747,6 @@ samples.
     # All vcf files end with the suffix .vcf.gz
     vcf-merge *.vcf.gz | bgzip -c > merged.vcf.gz
 
-## SNP annotation in CVI
-
-Use SNPeff to annotate variants present within Santo Antao island. We
-have WGS data for 190 accessions.
-
 ## Prepare VCF file for the 83 CVI accession
 
 The VCF file `superVcf_19-07-04_cvis.vcf.b.gz_snps.vcf.b.gz` (matching
@@ -2574,7 +2573,7 @@ cut -f2 nb_reads_vim2_deletion.txt | sort -n -
 awk -v OFS="\t" '$2 <= 50 {print $1,$2,"deletion"} $2 > 50 {print $1,$2,"no_deletion"}' nb_reads_vim2_deletion.txt > nb_reads_vim2_deletion_status.txt
 
 #################################################################
-# "VIM3" SNP
+# "VIM3" SNP Chr5_15047549
 
 # Get VCF data for SNP
 bcftools view -r Chr5:15047549 $VCF > Chr5_15047549.vcf
@@ -3739,7 +3738,7 @@ ${BIN}emma_kinship_kmers -t kmers_table -k 31 --maf 0.05 > kmers_table.kinship
 bsub -q normal -R "rusage[mem=5000]" -M 7000 combine_kmers_methylome_SA.sh
 ```
 
-## Run the GWAS
+## Run the kmersGWAS
 
 ``` bash
 mkdir output_dir
@@ -3761,7 +3760,7 @@ python convertKmers4mapping.py
 python map_kmers_methylome_SA.py
 ```
 
-## Manhattan plots
+## Manhattan plots kmersGWAS
 
 The plotting was performed on a Jupyter notebook.
 
@@ -3786,7 +3785,7 @@ chr4=30427671 + 19698289 + 23459830 + 18585056 / 2 + space * 3
 chr5=30427671 + 19698289 + 23459830 + 18585056 + 26975502 / 2 + space * 4
 ```
 
-### Figure 2b
+### kmersGWAS manhattan plot around VIM2/4 (Figure 2b)
 
 ``` python
 start = 24580000
@@ -3882,7 +3881,7 @@ plt.savefig("Fig2b_20260809.pdf", format="pdf",bbox_inches="tight")
 
 ![](images/output_3_0.png)
 
-### Figure S1a
+### kmersGWAS manhattan plot (Figure S1a)
 
 ``` python
 def parse_classical_GWAS(file):
@@ -3987,7 +3986,7 @@ plt.savefig("FigSup1a_20260809.pdf", format="pdf",bbox_inches="tight")
 
 ![](images/output_5_0.png)
 
-### Figure S1b
+### LD of SNPs around chr5:15047549 (Figure S1b)
 
 Calculate LD using plink (v1.90b6.26) between the top SNP at chr5
 (chr5:15047549) and the SNPs 1 Mb upstream and downstream of this SNP.
@@ -4324,6 +4323,8 @@ chr5    15840771        16:G>A
 chr1    24586963        5:A>C,16:T>A
 ```
 
+GWASkmer 2571: TTAGTGGTGGTTTAATGGAAAATAACTGTTT
+
 Sequence kmer in Col-0 at VIM4 promoter (chr1:24586964..24586994):
 TTAGTGGTGGTTTAATGGAAAATAACTGTTT (2 SNPs) Sequence kmer in Col-0 at VIM3
 promoter (chr1:24586964..24586994): TTAGTGGTGGTTTAATGGAAAATAACTGTTT (1
@@ -4348,6 +4349,107 @@ kmer at VIM3 promoter region:
 | S15-3    | 15,746,247 | 15,746,340    | 93       |
 | S5-10    | 15,840,849 | 15,840,942    | 93       |
 | TAIR10   | 15,840,678 | 15,840,771    | 93       |
+
+# LD analysis between VIM2/4 deletion and Chr5_15047549
+
+Define the LD between the suspicious top SNP of chr5 for gbM GWAS
+(Chr5_15047549) 790 kp upstream of VIM3 and the VIM2/4 deletion.
+
+Chr5_15047549 is named VIM3 for simplicity in the script.
+
+``` r
+summary_alleles_190_SA <- read.table("data/summary_alleles_190_SA.txt", header=TRUE)
+
+# Convert all variables into factors
+summary_alleles_190_SA <- summary_alleles_190_SA %>% mutate_at(1:5, as.factor) #%>% mutate_if(is.integer, as.logical)
+```
+
+See calculation of LD for 2 loci with 2 alleles:
+<https://www.ndsu.edu/pubweb/~mcclean/plsc731/Linkage%20Disequilibrium%20-%20Association%20Mapping%20in%20Plants-lecture-overheads.pdf>
+
+See also
+<https://pbgworks.org/sites/pbgworks.org/files/measuresoflinkagedisequilibrium-111119214123-phpapp01_0.pdf>
+
+I need to calculate the frequency of each combinations allele.
+
+VIM2 = A locus VIM3 = B locus
+
+A1 = VIM2ref A2 = VIM2del
+
+B1 = VIM3ref B2 = VIM3alt
+
+Frequency of each combinations:
+
+- $A1B1 = x11$
+- $A1B2 = x12$
+- $A2B1 = x21$
+- $A2B2 = x22$
+- $p1 = x11 + x12$
+- $p2 = x21 + x22$
+- $q1 = x11 + x21$
+- $q2 = x12 + x22$
+
+Standard LD calculated as $D = x11 - p1q1$ or $(x11)(x22) - (x12)(x21)$
+
+D can range from -0.25 to 0.25
+
+If D\>0, use Dmax (the smaller of p1q2 and p2q1) D’ = D / Dmax
+
+If D\<0, use Dmin (the larger of -p1q1 and -p2q2) D’ = D / Dmin
+
+``` r
+# Keep only accessions that have data for both allele with data (186)
+summary_alleles_186_SA <- summary_alleles_190_SA %>% na.omit(VIM2) %>% na.omit(VIM3) %>% droplevels()
+
+# Table of contingency (VIM2 in column, VIM3 in row
+vim_table_prop <- prop.table(xtabs(~ VIM3 + VIM2, data=summary_alleles_186_SA))
+
+p1 <- vim_table_prop[1,1] + vim_table_prop[2,1]
+p2 <- vim_table_prop[1,2] + vim_table_prop[2,2]
+q1 <- vim_table_prop[1,1] + vim_table_prop[1,2]
+q2 <- vim_table_prop[2,1] + vim_table_prop[2,2]
+
+D <- vim_table_prop[1,1] - (p1*q1)
+
+# Calculate D' (standardized) 
+if(D>=0){
+Dmax = min((p1*q2),(p2*q1))
+Dprime <- D / Dmax
+}else{
+Dmax = max((-p1*q2),(-p2*q1))
+Dprime <- D / Dmax
+}
+
+print(vim_table_prop)
+writeLines(paste("\nD is ",D, " and D' is ",Dprime))
+```
+
+        VIM2
+    VIM3         0         1
+       0 0.2258065 0.0000000
+       1 0.3064516 0.4677419
+
+    D is  0.105619146722164  and D' is  1
+
+D=0.1 and D’=1. Usually, D’ is used when comparing different pairs of
+alleles. Here we do not. Here D’ = 1 because Dmax = D. This is due to
+the fact that $x12=0$.
+
+Correlation using $r^2$
+
+$r^2=\frac{D^2}{p1*p2*q1*q2}$
+
+$r^2=0$ -\> Loci in complete linkage equilibrium
+
+$r^2=1$ -\> Loci in complete linkage disequilibrium
+
+``` r
+r2 <-  D^2 / (p1*p2*q1*q2)
+
+writeLines(paste("\nR2 is ",r2))
+```
+
+R2 is 0.256
 
 # DMR analysis for VIM2
 
@@ -5400,9 +5502,9 @@ Multiple Comparisons of Means: Tukey Contrasts
 Fit: aov(formula = percent_methylation ~ pool, data = df)
 
 Linear Hypotheses: Estimate Std. Error t value Pr(\>\|t\|)  
-ara1-SALK - ARA1-OE == 0 5.0455 0.5667 8.903 \< 0.001 \*** Col-0 -
+ara1-SALK - ARA1-OE == 0 5.0455 0.5667 8.903 \< 0.001 \* **Col-0 -
 ARA1-OE == 0 1.2969 0.5667 2.288 0.13379  
-Col-0 - ara1-SALK == 0 -3.7486 0.5667 -6.614 0.00127 **
+Col-0 - ara1-SALK == 0 -3.7486 0.5667 -6.614 0.00127**
 
 #### mCHG
 
@@ -5493,8 +5595,8 @@ Fit: aov(formula = percent_methylation ~ pool, data = df)
 
 Linear Hypotheses: Estimate Std. Error t value Pr(\>\|t\|)  
 ara12 - ara1-SAIL == 0 1.3206 0.2585 5.108 0.0052 \*\* Col-3 - ara1-SAIL
-== 0 -4.3065 0.2585 -16.657 \<0.001 *** Col-3 - ara12 == 0 -5.6272
-0.2585 -21.765 \<0.001 ***
+== 0 -4.3065 0.2585 -16.657 \<0.001 ***Col-3 - ara12 == 0 -5.6272 0.2585
+-21.765 \<0.001***
 
 #### mCHG
 
@@ -5523,8 +5625,8 @@ Fit: aov(formula = percent_methylation ~ pool, data = df)
 
 Linear Hypotheses: Estimate Std. Error t value Pr(\>\|t\|)  
 ara12 - ara1-SAIL == 0 0.3367 0.7415 0.454 0.8945  
-Col-3 - ara1-SAIL == 0 -2.6067 0.7415 -3.516 0.0295 * Col-3 - ara12 == 0
--2.9433 0.7415 -3.970 0.0173 *
+Col-3 - ara1-SAIL == 0 -2.6067 0.7415 -3.516 0.0295 *Col-3 - ara12 == 0
+-2.9433 0.7415 -3.970 0.0173*
 
 #### mCHH
 
@@ -5906,8 +6008,8 @@ Multiple Comparisons of Means: Dunnett Contrasts
 Fit: aov(formula = percent_methylation ~ genotype, data = df_fbx5_CG)
 
 Linear Hypotheses: Estimate Std. Error t value Pr(\>\|t\|)  
-fbx5_8_9 - S7_B5 == 0 2.0900 0.4066 5.140 0.00248 ** fbx5_12_3 - S7_B5
-== 0 2.2600 0.4066 5.558 0.00152 ** fbx5_3_23 - S7_B5 == 0 1.0833 0.4066
+fbx5_8_9 - S7_B5 == 0 2.0900 0.4066 5.140 0.00248 **fbx5_12_3 - S7_B5 ==
+0 2.2600 0.4066 5.558 0.00152** fbx5_3_23 - S7_B5 == 0 1.0833 0.4066
 2.664 0.06841 .
 
 ### mCHG

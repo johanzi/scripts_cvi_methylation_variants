@@ -2274,7 +2274,7 @@ cut -f2 nb_reads_vim2_deletion.txt | sort -n -
 awk -v OFS="\t" '$2 <= 50 {print $1,$2,"deletion"} $2 > 50 {print $1,$2,"no_deletion"}' nb_reads_vim2_deletion.txt > nb_reads_vim2_deletion_status.txt
 
 #################################################################
-# "VIM3" SNP
+# "VIM3" SNP Chr5_15047549
 
 # Get VCF data for SNP
 bcftools view -r Chr5:15047549 $VCF > Chr5_15047549.vcf
@@ -3488,7 +3488,7 @@ bsub -q normal -R "rusage[mem=5000]" -M 7000 combine_kmers_methylome_SA.sh
 ```
 
 
-## Run the GWAS
+## Run the kmersGWAS
 
 ```{bash, eval=FALSE}
 mkdir output_dir
@@ -3509,7 +3509,7 @@ python convertKmers4mapping.py
 python map_kmers_methylome_SA.py
 ```
 
-## Manhattan plots
+## Manhattan plots kmersGWAS
 
 The plotting was performed on a Jupyter notebook.
 
@@ -3535,7 +3535,7 @@ chr4=30427671 + 19698289 + 23459830 + 18585056 / 2 + space * 3
 chr5=30427671 + 19698289 + 23459830 + 18585056 + 26975502 / 2 + space * 4
 ```
 
-### Figure 2b
+### kmersGWAS manhattan plot around VIM2/4 (Figure 2b)
 
 ```{python, python.reticulate = FALSE}
 start = 24580000
@@ -3631,7 +3631,7 @@ plt.savefig("Fig2b_20260809.pdf", format="pdf",bbox_inches="tight")
 
 ![](images/output_3_0.png)
 
-### Figure S1a
+### kmersGWAS manhattan plot (Figure S1a)
 
 
 ```{python, python.reticulate = FALSE}
@@ -3738,7 +3738,7 @@ plt.savefig("FigSup1a_20260809.pdf", format="pdf",bbox_inches="tight")
 ![](images/output_5_0.png)
 
 
-### Figure S1b
+### LD of SNPs around chr5:15047549 (Figure S1b)
 
 Calculate LD using plink (v1.90b6.26) between the top SNP at chr5 (chr5:15047549) and the SNPs 1 Mb upstream and downstream of this SNP.
 
@@ -4076,6 +4076,8 @@ chr1    24586963        5:A>C,16:T>A
 
 ```
 
+GWASkmer 2571: TTAGTGGTGGTTTAATGGAAAATAACTGTTT
+
 Sequence kmer in Col-0 at VIM4 promoter (chr1:24586964..24586994): TTAGTGGTGGTTTAATGGAAAATAACTGTTT (2 SNPs)
 Sequence kmer in Col-0 at VIM3 promoter (chr1:24586964..24586994): TTAGTGGTGGTTTAATGGAAAATAACTGTTT (1 SNP)
 
@@ -4100,6 +4102,114 @@ kmer at VIM3 promoter region:
 | S5-10    | 15,840,849 | 15,840,942    | 93       |
 | TAIR10   | 15,840,678 | 15,840,771    | 93       |
 
+
+
+# LD analysis between VIM2/4 deletion and Chr5_15047549
+
+Define the LD between the suspicious top SNP of chr5 for gbM GWAS (Chr5_15047549) 790 kp upstream of VIM3 and the VIM2/4 deletion.
+
+Chr5_15047549 is named VIM3 for simplicity in the script.
+
+```{r}
+summary_alleles_190_SA <- read.table("data/summary_alleles_190_SA.txt", header=TRUE)
+
+# Convert all variables into factors
+summary_alleles_190_SA <- summary_alleles_190_SA %>% mutate_at(1:5, as.factor) #%>% mutate_if(is.integer, as.logical)
+
+```
+
+See calculation of LD for 2 loci with 2 alleles: https://www.ndsu.edu/pubweb/~mcclean/plsc731/Linkage%20Disequilibrium%20-%20Association%20Mapping%20in%20Plants-lecture-overheads.pdf
+
+See also https://pbgworks.org/sites/pbgworks.org/files/measuresoflinkagedisequilibrium-111119214123-phpapp01_0.pdf
+
+I need to calculate the frequency of each combinations allele.
+
+VIM2 = A locus
+VIM3 = B locus
+
+A1 = VIM2ref
+A2 = VIM2del
+
+B1 = VIM3ref
+B2 = VIM3alt
+
+Frequency of each combinations:
+
+* $A1B1 = x11$
+* $A1B2 = x12$
+* $A2B1 = x21$
+* $A2B2 = x22$
+* $p1 = x11 + x12$
+* $p2 = x21 + x22$
+* $q1 = x11 + x21$
+* $q2 = x12 + x22$
+
+Standard LD calculated as
+$D = x11 - p1q1$ or $(x11)(x22) - (x12)(x21)$
+
+D can range from -0.25 to 0.25
+
+If D>0, use Dmax (the smaller of p1q2 and p2q1)
+D' =  D / Dmax
+
+If D<0, use Dmin (the larger of -p1q1 and -p2q2)
+D' = D / Dmin
+
+```{r}
+# Keep only accessions that have data for both allele with data (186)
+summary_alleles_186_SA <- summary_alleles_190_SA %>% na.omit(VIM2) %>% na.omit(VIM3) %>% droplevels()
+
+# Table of contingency (VIM2 in column, VIM3 in row
+vim_table_prop <- prop.table(xtabs(~ VIM3 + VIM2, data=summary_alleles_186_SA))
+
+p1 <- vim_table_prop[1,1] + vim_table_prop[2,1]
+p2 <- vim_table_prop[1,2] + vim_table_prop[2,2]
+q1 <- vim_table_prop[1,1] + vim_table_prop[1,2]
+q2 <- vim_table_prop[2,1] + vim_table_prop[2,2]
+
+D <- vim_table_prop[1,1] - (p1*q1)
+
+# Calculate D' (standardized) 
+if(D>=0){
+Dmax = min((p1*q2),(p2*q1))
+Dprime <- D / Dmax
+}else{
+Dmax = max((-p1*q2),(-p2*q1))
+Dprime <- D / Dmax
+}
+
+print(vim_table_prop)
+writeLines(paste("\nD is ",D, " and D' is ",Dprime))
+
+```
+
+```
+    VIM2
+VIM3         0         1
+   0 0.2258065 0.0000000
+   1 0.3064516 0.4677419
+
+D is  0.105619146722164  and D' is  1
+```
+
+D=0.1 and D'=1. Usually, D' is used when comparing different pairs of alleles. Here we do not.
+Here D' = 1 because Dmax = D. This is due to the fact that $x12=0$.
+
+Correlation using $r^2$
+
+$r^2=\frac{D^2}{p1*p2*q1*q2}$
+
+$r^2=0$ -> Loci in complete linkage equilibrium
+
+$r^2=1$ -> Loci in complete linkage disequilibrium
+
+```{r}
+r2 <-  D^2 / (p1*p2*q1*q2)
+
+writeLines(paste("\nR2 is ",r2))
+```
+
+R2 is  0.256
 
 # DMR analysis for VIM2
 
