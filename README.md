@@ -1,5 +1,4 @@
-High impact mutations drive DNA methylation variation after colonization
-of a novel habitat
+A VIM2/4 deletion, and premature truncations of CMT2 and FBX5, drive DNA methylation changes after colonization of a novel habitat
 ================
 Johan Zicola
 2026-06-19 09:25:30
@@ -295,6 +294,8 @@ Johan Zicola
 - [License](#license)
 
 # Overview
+
+Scripts of the publication [Zicola et al. 2026](https://www.nature.com/articles/s41477-026-02352-2).
 
 This documentation explains step by step how was performed the analysis
 on whole-genome bisulfite sequencing (WGBS) data on African *Arabidopsis
